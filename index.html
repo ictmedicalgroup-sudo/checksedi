@@ -85,7 +85,7 @@ input,select,textarea{font-size:16px!important}
 .tb-user{width:38px;height:38px;border-radius:50%;background:var(--verde);color:#fff;
   display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:0 0 auto;cursor:pointer}
 
-.view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;padding:14px 14px 90px}
+.view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;padding:14px 14px 24px}
 .view.no-bottombar{padding-bottom:24px}
 
 /* ── Search / lista sedi ─────────────────────────────────── */
@@ -151,9 +151,10 @@ input,select,textarea{font-size:16px!important}
 .ci-state.s-nf svg{stroke:var(--g500);stroke-width:2.5}
 
 /* ── Bottom bar ──────────────────────────────────────────── */
-.bottom-bar{position:absolute;left:0;right:0;bottom:0;background:#fff;
+.bottom-bar{flex:0 0 auto;display:none;background:#fff;
   box-shadow:0 -4px 16px rgba(74,76,77,.10);
-  padding:12px 14px max(12px,env(safe-area-inset-bottom));display:flex;gap:10px;z-index:40}
+  padding:12px 14px max(12px,env(safe-area-inset-bottom));gap:10px;z-index:40}
+.bottom-bar.show{display:flex}
 .bottom-bar .btn{flex:1}
 .btn-ghost{background:var(--g100);color:var(--g700)}
 .fab{position:absolute;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));
@@ -255,6 +256,12 @@ input,select,textarea{font-size:16px!important}
   <div class="view no-bottombar hid" id="v-rapporti"></div>
   <!-- VIEW: NUOVO RAPPORTO -->
   <div class="view hid" id="v-nuovo"></div>
+
+  <!-- Barra azioni fissa (solo nel flusso "nuovo controllo") -->
+  <div class="bottom-bar" id="bottom-bar">
+    <button class="btn btn-ghost" onclick="confirmExitNuovo()">Annulla</button>
+    <button class="btn btn-primary" id="bb-save" onclick="salvaRapporto()">Salva controllo</button>
+  </div>
 </div>
 
 <!-- MODALE ELEMENTO -->
@@ -462,6 +469,7 @@ function showView(id,push){
   if(push) S.stack.push(currentView());
   VIEWS.forEach(v=>$(v).classList.toggle('hid',v!==id));
   $('tb-back').classList.toggle('hid', id==='v-sedi');
+  $('bottom-bar').classList.toggle('show', id==='v-nuovo');
   $(id).scrollTop=0;
 }
 function currentView(){return VIEWS.find(v=>!$(v).classList.contains('hid'))||'v-sedi';}
@@ -594,6 +602,7 @@ function startNuovo(){
   S.flow={ sedeId:S.sedeCorrente.id, rapportoId:null,
     voci:{}, ultimo:ultimoControlloPerSede(S.sedeCorrente.id) };
   setTopbar('Nuovo controllo', S.sedeCorrente.nome);
+  const sb=$('bb-save'); if(sb){sb.innerHTML='Salva controllo';sb.disabled=false;}
   showView('v-nuovo', true);
   renderNuovo();
 }
@@ -625,11 +634,7 @@ function renderNuovo(){
       </div>
     </div>`;
   });
-  $('v-nuovo').innerHTML=h+`
-    <div class="bottom-bar">
-      <button class="btn btn-ghost" onclick="confirmExitNuovo()">Annulla</button>
-      <button class="btn btn-primary" onclick="salvaRapporto()">Salva controllo</button>
-    </div>`;
+  $('v-nuovo').innerHTML=h;
 }
 
 // ── Modale elemento ──────────────────────────────────────────────────────
@@ -670,7 +675,7 @@ async function salvaRapporto(){
   const compilati=Object.keys(S.flow.voci).length;
   if(!compilati){ toast('Compila almeno un elemento','err'); return; }
   _saving=true;
-  const btn=document.querySelector('#v-nuovo .btn-primary');
+  const btn=$('bb-save');
   if(btn){btn.innerHTML='<span class="spn"></span> Salvo…';btn.disabled=true;}
   try{
     const geo=await getGeo();
