@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check Sedi — Gestione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --verde:#9DBF60; --verde-d:#7DA343; --verde-l:#D5E3B7; --verde-xl:#EEF5E3;
+  --grigio:#77797a; --navy:#4A4C4D;
+  --red:#C0392B; --red-l:#FDECEA;
+  --ok:#5A9E3F; --ok-bg:#E8F2DC; --ok-bd:#Bcd99a;
+  --ko:#C0392B; --ko-bg:#FBE3E0; --ko-bd:#EDB6AF;
+  --nf:#9a9c9d; --nf-bg:#F0F2EE;
+  --g50:#F8F9F8; --g100:#F0F2EE; --g200:#E2E6DF; --g300:#C8CEC4;
+  --g500:#77797a; --g700:#4A4C4D; --g900:#2A2C2D;
+  --r:10px; --rsm:6px; --rlg:16px;
+  --sh-sm:0 1px 3px rgba(74,76,77,.08),0 1px 2px rgba(74,76,77,.05);
+  --sh-md:0 4px 12px rgba(74,76,77,.10);
+  --sh-lg:0 12px 32px rgba(74,76,77,.14),0 4px 10px rgba(74,76,77,.07);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Raleway',sans-serif;background:var(--g100);color:var(--g900);font-size:14px}
+button,input,select,textarea{font-family:inherit}
+.hid{display:none!important}
+.spn{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.45);
+  border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-3px}
+.spn-d{border-color:var(--g300);border-top-color:var(--verde)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Toast (desktop: basso destra) ───────────────────────── */
+#toast{position:fixed;bottom:22px;right:22px;z-index:9500;background:var(--navy);color:#fff;
+  padding:13px 18px;border-radius:var(--r);box-shadow:var(--sh-lg);font-weight:600;
+  transform:translateY(180%);transition:transform .3s cubic-bezier(.2,.8,.3,1);max-width:340px}
+#toast.show{transform:translateY(0)}
+#toast.err{background:var(--red)} #toast.ok{background:var(--verde-d)}
+
+/* ── Loader / Login ──────────────────────────────────────── */
+#loader{position:fixed;inset:0;background:var(--g100);z-index:9000;display:flex;align-items:center;justify-content:center}
+#login{position:fixed;inset:0;z-index:8000;background:linear-gradient(150deg,#fff,var(--verde-xl));
+  display:flex;align-items:center;justify-content:center;padding:24px}
+.lcard{width:100%;max-width:400px;background:#fff;border-radius:var(--rlg);box-shadow:var(--sh-lg);padding:34px}
+.llogo{text-align:center;margin-bottom:26px}
+.llogo .big{font-size:30px;font-weight:800;letter-spacing:-.5px}
+.llogo .big span{color:var(--verde)}
+.llogo .sub{font-size:12px;letter-spacing:3px;color:var(--grigio);font-weight:600;text-transform:uppercase;margin-top:6px}
+.lcard h1{font-size:20px;margin-bottom:4px}
+.lcard .hint{color:var(--grigio);font-size:13.5px;margin-bottom:22px}
+.field{margin-bottom:15px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--grigio);margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:11px 13px;border:1.5px solid var(--g200);
+  border-radius:var(--rsm);background:var(--g50);font-size:14px;transition:border-color .15s,background .15s}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--verde);background:#fff}
+.lerr{background:var(--red-l);color:var(--red);padding:11px 13px;border-radius:var(--rsm);font-size:13px;font-weight:600;margin-bottom:14px;display:none}
+.btn{padding:11px 18px;border:none;border-radius:var(--rsm);font-size:14px;font-weight:700;cursor:pointer;transition:transform .08s,background .15s,opacity .15s}
+.btn:active{transform:scale(.98)} .btn:disabled{opacity:.6;cursor:default}
+.btn-primary{background:var(--verde);color:#fff} .btn-primary:hover:not(:disabled){background:var(--verde-d)}
+.btn-ghost{background:var(--g100);color:var(--g700)} .btn-ghost:hover{background:var(--g200)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-sm{padding:7px 12px;font-size:13px}
+.btn-block{width:100%}
+
+/* ── App shell ───────────────────────────────────────────── */
+#app{display:none;min-height:100vh;flex-direction:column}
+.topnav{background:#fff;box-shadow:var(--sh-sm);position:sticky;top:0;z-index:300;
+  display:flex;align-items:center;gap:6px;padding:0 22px;height:60px}
+.tn-logo{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-right:18px;white-space:nowrap}
+.tn-logo span{color:var(--verde)}
+.tn-item{padding:8px 15px;border-radius:var(--rsm);font-weight:600;color:var(--g700);cursor:pointer;
+  background:none;border:none;font-size:14px;white-space:nowrap}
+.tn-item:hover{background:var(--g100)} .tn-item.active{background:var(--verde-xl);color:var(--verde-d)}
+.tnb-drop{position:relative;display:flex}
+.tnb-menu{position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid var(--g200);
+  border-radius:var(--rsm);box-shadow:var(--sh-lg);min-width:190px;z-index:400;padding:6px;display:none}
+.tnb-menu.show{display:block}
+.tnb-menu .tn-item{display:block;width:100%;text-align:left}
+.tn-spacer{flex:1}
+.tn-user{display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 8px;border-radius:var(--rsm)}
+.tn-user:hover{background:var(--g100)}
+.tn-ava{width:34px;height:34px;border-radius:50%;background:var(--verde);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.tn-uname{font-weight:600;font-size:13.5px} .tn-urole{font-size:11px;color:var(--grigio);text-transform:uppercase}
+
+.main{flex:1;padding:26px 28px;max-width:1500px;width:100%;margin:0 auto}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.page-head h2{font-size:23px;font-weight:800}
+.page-head .desc{color:var(--grigio);font-size:13.5px;margin-top:3px}
+.page-head .actions{display:flex;gap:10px}
+
+/* ── Cards / filtri ──────────────────────────────────────── */
+.panel{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);padding:18px 20px;margin-bottom:18px}
+.filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.filters .f{display:flex;flex-direction:column;gap:5px}
+.filters label{font-size:11.5px;font-weight:700;color:var(--grigio);text-transform:uppercase;letter-spacing:.4px}
+.filters input,.filters select{padding:9px 11px;border:1.5px solid var(--g200);border-radius:var(--rsm);background:var(--g50);font-size:13.5px;min-width:170px}
+.filters input:focus,.filters select:focus{outline:none;border-color:var(--verde);background:#fff}
+
+/* ── Stat tiles ──────────────────────────────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+.tile{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);padding:16px 18px}
+.tile .v{font-size:27px;font-weight:800;line-height:1} .tile .l{font-size:12.5px;color:var(--grigio);margin-top:5px;font-weight:600}
+.tile.ok .v{color:var(--ok)} .tile.ko .v{color:var(--ko)} .tile.verde .v{color:var(--verde-d)}
+
+/* ── Tabelle ─────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+thead th{text-align:left;padding:11px 14px;font-size:11.5px;font-weight:700;color:var(--grigio);
+  text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid var(--g100);white-space:nowrap}
+tbody td{padding:12px 14px;border-bottom:1px solid var(--g100);vertical-align:middle}
+tbody tr:hover{background:var(--g50)}
+tr.row-annullata td{background:#D8DAD5!important;color:var(--g500)!important}
+.tbl-wrap{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);overflow:hidden}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.ko{background:var(--ko-bg);color:var(--ko)} .pill.nf{background:var(--nf-bg);color:var(--nf)}
+.pill.admin{background:var(--verde-xl);color:var(--verde-d)} .pill.incaricato{background:var(--g100);color:var(--g700)}
+.pill.on{background:var(--ok-bg);color:var(--ok)} .pill.off{background:var(--red-l);color:var(--red)}
+.linkact{color:var(--verde-d);font-weight:700;cursor:pointer;background:none;border:none;font-size:13.5px}
+.linkact:hover{text-decoration:underline}
+.muted{color:var(--grigio)}
+
+/* ── Matrice rapporti affiancati ─────────────────────────── */
+.matrix-wrap{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);overflow:hidden}
+.matrix-scroll{overflow-x:auto;overflow-y:visible}
+table.matrix{border-collapse:separate;border-spacing:0;font-size:13px;min-width:max-content}
+table.matrix th,table.matrix td{border-bottom:1px solid var(--g100);border-right:1px solid var(--g100)}
+/* colonna titoli elementi: sticky a sinistra */
+table.matrix .el-h,table.matrix .el-c{position:sticky;left:0;z-index:5;background:#fff;
+  min-width:240px;max-width:300px;text-align:left;box-shadow:2px 0 0 var(--g200)}
+table.matrix thead .el-h{z-index:7;background:var(--g50)}
+table.matrix thead th{position:sticky;top:0;z-index:4;background:var(--g50);padding:10px 12px;
+  font-size:11.5px;text-align:center;min-width:130px;vertical-align:bottom}
+table.matrix thead th .rd{font-size:13px;font-weight:800;color:var(--g900);text-transform:none;letter-spacing:0}
+table.matrix thead th .rw{font-size:11px;color:var(--grigio);font-weight:600;margin-top:2px;text-transform:none;letter-spacing:0;white-space:normal}
+table.matrix thead th.annull .rd{color:var(--g500);text-decoration:line-through}
+table.matrix .el-c{padding:10px 12px;font-weight:600;color:var(--g900);vertical-align:middle}
+table.matrix td.cell{text-align:center;padding:8px 10px;cursor:default;vertical-align:middle}
+table.matrix td.cell.ok{background:var(--ok-bg)}
+table.matrix td.cell.ko{background:var(--ko-bg)}
+table.matrix td.cell.nf{background:repeating-linear-gradient(45deg,#fff,#fff 5px,var(--g50) 5px,var(--g50) 10px)}
+.cell .ic{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin:0 auto}
+.cell .ic svg{width:13px;height:13px;stroke:#fff;stroke-width:3}
+.cell.ok .ic{background:var(--ok)} .cell.ko .ic{background:var(--ko)}
+.cell .note{font-size:11px;color:var(--g700);margin-top:4px;line-height:1.3;max-width:150px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cell.nf .dash{color:var(--g300);font-size:18px;font-weight:700}
+.matrix-foot{padding:10px 14px;font-size:12px;color:var(--grigio);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.lgnd{display:inline-flex;align-items:center;gap:6px} .lgnd .sw{width:13px;height:13px;border-radius:3px}
+
+/* ── Modale ──────────────────────────────────────────────── */
+.modal{position:fixed;inset:0;z-index:7000;display:none;align-items:center;justify-content:center;padding:24px}
+.modal.show{display:flex}
+.mback{position:absolute;inset:0;background:rgba(42,44,45,.5)}
+.msheet{position:relative;background:#fff;border-radius:var(--rlg);box-shadow:var(--sh-lg);
+  width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column}
+.msheet.wide{max-width:760px}
+.mhead{padding:20px 24px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between}
+.mhead h3{font-size:18px;font-weight:800} .mhead .x{background:none;border:none;font-size:24px;color:var(--g500);cursor:pointer;line-height:1}
+.mbody{padding:20px 24px;overflow-y:auto}
+.mfoot{padding:16px 24px;border-top:1px solid var(--g100);display:flex;gap:10px;justify-content:flex-end}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.toggle{display:flex;gap:10px}
+.tg-opt{flex:1;padding:12px;border:2px solid var(--g200);border-radius:var(--rsm);background:#fff;cursor:pointer;
+  text-align:center;font-weight:700;color:var(--g500);transition:all .14s}
+.tg-opt.sel-ok{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
+.tg-opt.sel-ko{border-color:var(--ko);background:var(--ko-bg);color:var(--ko)}
+
+/* ── Checklist config (elementi) ─────────────────────────── */
+.el-list{display:flex;flex-direction:column;gap:8px}
+.el-row{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--g200);
+  border-radius:var(--rsm);padding:11px 14px}
+.el-row .grab{color:var(--g300);cursor:grab;font-size:16px}
+.el-row .et{flex:1;font-weight:600}
+.el-row.dragging{opacity:.4}
+.chk{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--g700)}
+.chk input{width:17px;height:17px;accent-color:var(--verde)}
+
+.empty{text-align:center;padding:46px 24px;color:var(--grigio)}
+.empty .et{font-size:15px;font-weight:600;color:var(--g700);margin-bottom:4px}
+.pager{display:flex;gap:6px;align-items:center;justify-content:center;padding:14px}
+.pager button{padding:7px 12px;border:1px solid var(--g200);background:#fff;border-radius:var(--rsm);cursor:pointer;font-weight:600}
+.pager button:disabled{opacity:.45;cursor:default} .pager .pinfo{font-size:13px;color:var(--grigio);margin:0 8px}
+</style>
+</head>
+<body>
+
+<div id="loader"><span class="spn spn-d" style="width:32px;height:32px;border-width:3px"></span></div>
+<div id="toast"></div>
+
+<!-- LOGIN -->
+<div id="login" class="hid">
+  <div class="lcard">
+    <div class="llogo"><div class="big">Medical<span>Group</span></div><div class="sub">Check Sedi</div></div>
+    <h1>Gestione controlli</h1>
+    <div class="hint">Accesso riservato a incaricati e amministratori</div>
+    <div class="lerr" id="lerr"></div>
+    <div class="field"><label>E-Mail</label><input type="email" id="li-email" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input type="password" id="li-pwd" autocomplete="current-password"></div>
+    <button class="btn btn-primary btn-block" id="li-btn" onclick="doLogin()">Accedi</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <nav class="topnav">
+    <div class="tn-logo">Medical<span>Group</span></div>
+    <button class="tn-item" data-pg="rapporti" onclick="goPage('rapporti')">Rapporti</button>
+    <button class="tn-item" data-pg="matrice" onclick="goPage('matrice')">Confronto sede</button>
+    <button class="tn-item" data-pg="checklist" onclick="goPage('checklist')">Checklist</button>
+    <div class="tnb-drop" id="admin-drop">
+      <button class="tn-item" id="admin-btn" onclick="toggleAdminMenu(event)">Admin ▾</button>
+      <div class="tnb-menu" id="admin-menu">
+        <button class="tn-item" data-pg="profili" onclick="goPage('profili')">Profili di accesso</button>
+        <button class="tn-item" data-pg="log" onclick="goPage('log')">Log</button>
+      </div>
+    </div>
+    <div class="tn-spacer"></div>
+    <div class="tn-user" onclick="doLogout()" title="Esci">
+      <div class="tn-ava" id="tn-ava"></div>
+      <div><div class="tn-uname" id="tn-uname"></div><div class="tn-urole" id="tn-urole"></div></div>
+    </div>
+  </nav>
+  <div class="main" id="main"></div>
+</div>
+
+<!-- MODALE generica -->
+<div class="modal" id="modal">
+  <div class="mback" onclick="closeModal()"></div>
+  <div class="msheet" id="msheet">
+    <div class="mhead"><h3 id="m-title"></h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="mbody" id="m-body"></div>
+    <div class="mfoot" id="m-foot"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════════════════════════
+const CFG = {
+  URL:'https://iczsdqcnvauopwkuspti.supabase.co',
+  KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljenNkcWNudmF1b3B3a3VzcHRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTQ0MjMsImV4cCI6MjA5MjQzMDQyM30.SmcRHPLM2PEq4Hn-5CQhMyQKoz0PN_0lbN_X3l9MNUE',
+  FN:'https://iczsdqcnvauopwkuspti.supabase.co/functions/v1',
+};
+const T = n => `checksedi_${n}`;
+
+// ════════════════════════════════════════════════════════════════════════
+//  STATO
+// ════════════════════════════════════════════════════════════════════════
+const S = {
+  token:null, user:null,
+  sedi:[], elementi:[], esclusioni:{}, profili:[], profById:{},
+  page:'rapporti',
+};
+const NAV_MAIN  = [
+  {id:'rapporti',  l:'Rapporti',       r:['admin','incaricato']},
+  {id:'matrice',   l:'Confronto sede', r:['admin','incaricato']},
+  {id:'checklist', l:'Checklist',      r:['admin','incaricato']},
+];
+const NAV_ADMIN = [
+  {id:'profili', l:'Profili di accesso', r:['admin']},
+  {id:'log',     l:'Log',               r:['admin']},
+];
+
+// ════════════════════════════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg,type){const t=$('toast');t.textContent=msg;t.className='show'+(type?' '+type:'');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.className='',2800);}
+function initials(u){const a=(u?.nome||'').trim()[0]||'';const b=(u?.cognome||'').trim()[0]||'';
+  return (a+b).toUpperCase()||(u?.email||'?')[0].toUpperCase();}
+const MESI=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+function fmtData(d){if(!d)return'';const[y,m,g]=d.split('-');return `${+g} ${MESI[+m-1]} ${y}`;}
+function fmtDataBreve(d){if(!d)return'';const[y,m,g]=d.split('-');return `${+g}/${+m}/${String(y).slice(2)}`;}
+function fmtTS(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function oggiISO(){const d=new Date();const off=d.getTimezoneOffset();return new Date(d.getTime()-off*60000).toISOString().slice(0,10);}
+function isoMinus(days){const d=new Date();d.setDate(d.getDate()-days);const off=d.getTimezoneOffset();return new Date(d.getTime()-off*60000).toISOString().slice(0,10);}
+function nomeUtente(id){const p=S.profById[id];return p?`${p.nome} ${p.cognome}`.trim()||p.email:'—';}
+function nomeSede(id){const s=S.sedi.find(x=>x.id===id);return s?s.nome:'—';}
+const isAdmin=()=>S.user&&S.user.ruolo==='admin';
+
+// ════════════════════════════════════════════════════════════════════════
+//  SUPABASE REST
+// ════════════════════════════════════════════════════════════════════════
+async function db(method, table, opts={}){
+  const {flt='',body=null,sel='*',ord='',lim=''}=opts;
+  let url=`${CFG.URL}/rest/v1/${table}?select=${sel}`;
+  if(flt) url+=`&${flt}`;
+  if(ord) url+=`&order=${ord}`;
+  if(lim) url+=`&limit=${lim}`;
+  const headers={'apikey':CFG.KEY,'Authorization':`Bearer ${S.token||CFG.KEY}`,'Content-Type':'application/json'};
+  if(method==='POST'||method==='PATCH') headers['Prefer']='return=representation';
+  const res=await fetch(url,{method,headers,body:body?JSON.stringify(body):undefined});
+  if(!res.ok){throw new Error(`${method} ${table}: ${await res.text()}`);}
+  return method==='DELETE'?null:res.json();
+}
+async function supaLogin(email,password){
+  const res=await fetch(`${CFG.URL}/auth/v1/token?grant_type=password`,{
+    method:'POST',headers:{'apikey':CFG.KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({email,password})});
+  const data=await res.json();
+  if(!res.ok) throw new Error(data.error_description||data.msg||'Credenziali non valide');
+  return data;
+}
+async function callFn(action,payload){
+  const res=await fetch(`${CFG.FN}/checksedi-manage-user`,{
+    method:'POST',headers:{'apikey':CFG.KEY,'Authorization':`Bearer ${S.token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({action,...payload})});
+  const data=await res.json();
+  if(!res.ok) throw new Error(data.error||'Errore funzione');
+  return data;
+}
+async function logAz(azione,dettaglio){
+  try{await db('POST',T('log'),{body:{utente_id:S.user.id,
+    utente_nome:`${S.user.nome} ${S.user.cognome}`.trim(),azione,dettaglio:dettaglio||null}});}catch(e){}
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════════════════════════════
+async function doLogin(){
+  const email=$('li-email').value.trim(),pwd=$('li-pwd').value,err=$('lerr'),btn=$('li-btn');
+  err.style.display='none';
+  if(!email||!pwd){err.textContent='Inserisci email e password';err.style.display='block';return;}
+  btn.innerHTML='<span class="spn"></span> Accesso…';btn.disabled=true;
+  try{
+    const auth=await supaLogin(email,pwd);
+    S.token=auth.access_token;
+    const [profilo]=await db('GET',T('profili'),{flt:`id=eq.${auth.user.id}`});
+    if(!profilo) throw new Error('Profilo non trovato. Contatta l\'amministratore.');
+    if(profilo.attivo===false) throw new Error('Utente disabilitato. Contatta l\'amministratore.');
+    S.user=profilo;
+    await loadBase();
+    $('login').classList.add('hid'); $('app').style.display='flex';
+    $('tn-ava').textContent=initials(S.user);
+    $('tn-uname').textContent=`${S.user.nome} ${S.user.cognome}`.trim();
+    $('tn-urole').textContent=S.user.ruolo;
+    if(!isAdmin()) $('admin-drop').style.display='none';
+    goPage('rapporti');
+  }catch(e){err.textContent=e.message;err.style.display='block';btn.innerHTML='Accedi';btn.disabled=false;}
+}
+function doLogout(){S.token=null;S.user=null;location.reload();}
+
+async function loadBase(){
+  const reqs=[
+    db('GET','sedi_sedi',{sel:'id,nome,indirizzo,attiva,ordine',ord:'ordine.asc,nome.asc'}),
+    db('GET',T('elementi'),{ord:'ordine.asc'}),
+    db('GET',T('sede_esclusioni'),{sel:'sede_id,elemento_id'}),
+    db('GET',T('profili'),{ord:'cognome.asc,nome.asc'}),
+  ];
+  const [sedi,elementi,escl,profili]=await Promise.all(reqs);
+  S.sedi=sedi; S.elementi=elementi; S.profili=profili;
+  S.profById={}; profili.forEach(p=>S.profById[p.id]=p);
+  S.esclusioni={};
+  escl.forEach(e=>{(S.esclusioni[e.sede_id]||(S.esclusioni[e.sede_id]=new Set())).add(e.elemento_id);});
+}
+function elementiAttivi(){return S.elementi.filter(e=>e.attivo);}
+function elementiSede(sedeId){const ex=S.esclusioni[sedeId]||new Set();return elementiAttivi().filter(e=>!ex.has(e.id));}
+
+// ════════════════════════════════════════════════════════════════════════
+//  NAVIGAZIONE
+// ════════════════════════════════════════════════════════════════════════
+function pgGuard(id){
+  const def=[...NAV_MAIN,...NAV_ADMIN].find(p=>p.id===id);
+  return def && def.r.includes(S.user.ruolo);
+}
+function goPage(id){
+  if(!pgGuard(id)){toast('Pagina non disponibile','err');return;}
+  S.page=id; closeAdminMenu();
+  document.querySelectorAll('.tn-item[data-pg]').forEach(b=>b.classList.toggle('active',b.dataset.pg===id));
+  const r={rapporti:renderRapporti,matrice:renderMatrice,checklist:renderChecklist,profili:renderProfili,log:renderLog}[id];
+  r&&r();
+}
+function toggleAdminMenu(e){e.stopPropagation();$('admin-menu').classList.toggle('show');}
+function closeAdminMenu(){$('admin-menu')&&$('admin-menu').classList.remove('show');}
+document.addEventListener('click',e=>{if(!$('admin-drop')?.contains(e.target))closeAdminMenu();});
+
+// ════════════════════════════════════════════════════════════════════════
+//  MODALE
+// ════════════════════════════════════════════════════════════════════════
+function openModal(title,bodyHTML,footHTML,wide){
+  $('m-title').textContent=title; $('m-body').innerHTML=bodyHTML; $('m-foot').innerHTML=footHTML||'';
+  $('msheet').classList.toggle('wide',!!wide);
+  $('modal').classList.add('show');
+}
+function closeModal(){$('modal').classList.remove('show');}
+
+// ════════════════════════════════════════════════════════════════════════
+//  PAGINA — RAPPORTI (elenco filtrabile + gestione)
+// ════════════════════════════════════════════════════════════════════════
+const FR={sede:'',inc:'',da:'',a:'',stato:'attivo',page:1};
+let _rapporti=[];
+async function renderRapporti(){
+  $('main').innerHTML=`
+    <div class="page-head"><div><h2>Rapporti</h2>
+      <div class="desc">Tutti i controlli registrati sulle sedi</div></div></div>
+    <div class="panel"><div class="filters">
+      <div class="f"><label>Sede</label><select id="fr-sede">${optSedi(FR.sede)}</select></div>
+      <div class="f"><label>Incaricato</label><select id="fr-inc">${optInc(FR.inc)}</select></div>
+      <div class="f"><label>Da</label><input type="date" id="fr-da" value="${FR.da}"></div>
+      <div class="f"><label>A</label><input type="date" id="fr-a" value="${FR.a}"></div>
+      <div class="f"><label>Stato</label><select id="fr-stato">
+        <option value="">Tutti</option>
+        <option value="attivo" ${FR.stato==='attivo'?'selected':''}>Attivi</option>
+        <option value="annullato" ${FR.stato==='annullato'?'selected':''}>Annullati</option>
+      </select></div>
+      <button class="btn btn-primary btn-sm" onclick="applyRapFilters()">Filtra</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetRapFilters()">Azzera</button>
+    </div></div>
+    <div id="rap-body"></div>`;
+  await loadRapporti();
+}
+function optSedi(sel){return `<option value="">Tutte</option>`+S.sedi.map(s=>`<option value="${s.id}" ${s.id===sel?'selected':''}>${esc(s.nome)}</option>`).join('');}
+function optInc(sel){return `<option value="">Tutti</option>`+S.profili.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${esc(`${p.nome} ${p.cognome}`.trim()||p.email)}</option>`).join('');}
+function applyRapFilters(){FR.sede=$('fr-sede').value;FR.inc=$('fr-inc').value;FR.da=$('fr-da').value;FR.a=$('fr-a').value;FR.stato=$('fr-stato').value;FR.page=1;loadRapporti();}
+function resetRapFilters(){FR.sede='';FR.inc='';FR.da='';FR.a='';FR.stato='attivo';FR.page=1;renderRapporti();}
+async function loadRapporti(){
+  $('rap-body').innerHTML=`<div class="panel"><span class="spn spn-d"></span> Carico…</div>`;
+  const flts=[];
+  if(FR.sede) flts.push(`sede_id=eq.${FR.sede}`);
+  if(FR.inc) flts.push(`incaricato_id=eq.${FR.inc}`);
+  if(FR.da) flts.push(`data=gte.${FR.da}`);
+  if(FR.a) flts.push(`data=lte.${FR.a}`);
+  if(FR.stato) flts.push(`stato=eq.${FR.stato}`);
+  const raps=await db('GET',T('rapporti'),{flt:flts.join('&'),ord:'data.desc,created_at.desc'});
+  const ids=raps.map(r=>r.id);
+  let voci=[];
+  if(ids.length) voci=await db('GET',T('voci'),{flt:`rapporto_id=in.(${ids.join(',')})`});
+  const byR={}; voci.forEach(v=>{(byR[v.rapporto_id]||(byR[v.rapporto_id]=[])).push(v);});
+  raps.forEach(r=>r._voci=byR[r.id]||[]);
+  _rapporti=raps;
+  drawRapTable();
+}
+function tally(r){let ok=0,ko=0;r._voci.forEach(v=>{if(v.stato==='ok')ok++;else if(v.stato==='ko')ko++;});
+  const tot=elementiSede(r.sede_id).length;return {ok,ko,nf:Math.max(0,tot-ok-ko),tot};}
+function drawRapTable(){
+  if(!_rapporti.length){$('rap-body').innerHTML=`<div class="tbl-wrap"><div class="empty"><div class="et">Nessun rapporto</div><div>Modifica i filtri per ampliare la ricerca</div></div></div>`;return;}
+  const PER=25,tot=_rapporti.length,pages=Math.ceil(tot/PER);
+  if(FR.page>pages)FR.page=pages;
+  const slice=_rapporti.slice((FR.page-1)*PER,FR.page*PER);
+  let h=`<div class="tbl-wrap"><table><thead><tr>
+    <th>Data</th><th>Sede</th><th>Incaricato</th><th>Esiti</th><th>Note</th><th></th></tr></thead><tbody>`;
+  slice.forEach(r=>{
+    const t=tally(r);
+    h+=`<tr class="${r.stato==='annullato'?'row-annullata':''}">
+      <td><strong>${fmtData(r.data)}</strong></td>
+      <td>${esc(nomeSede(r.sede_id))}</td>
+      <td>${esc(nomeUtente(r.incaricato_id))}</td>
+      <td><span class="pill ok">${t.ok}</span> <span class="pill ko">${t.ko}</span> <span class="pill nf">${t.nf} nf</span></td>
+      <td class="muted">${r.note?esc(r.note):'—'}</td>
+      <td><button class="linkact" onclick="openRapDetail('${r.id}')">Apri</button></td>
+    </tr>`;
+  });
+  h+=`</tbody></table>`;
+  if(pages>1){h+=`<div class="pager">
+    <button onclick="rapPage(${FR.page-1})" ${FR.page<=1?'disabled':''}>‹ Prec</button>
+    <span class="pinfo">Pagina ${FR.page} di ${pages}</span>
+    <button onclick="rapPage(${FR.page+1})" ${FR.page>=pages?'disabled':''}>Succ ›</button></div>`;}
+  h+=`</div>`;
+  $('rap-body').innerHTML=h;
+}
+function rapPage(p){FR.page=p;drawRapTable();window.scrollTo({top:0,behavior:'smooth'});}
+
+function openRapDetail(id){
+  const r=_rapporti.find(x=>x.id===id); if(!r)return;
+  const els=elementiSede(r.sede_id);
+  const vById={}; r._voci.forEach(v=>vById[v.elemento_id]=v);
+  let rows=els.map(e=>{
+    const v=vById[e.id];
+    const st=v?v.stato:'non_fatto';
+    const pill={ok:'<span class="pill ok">OK</span>',ko:'<span class="pill ko">KO</span>',non_fatto:'<span class="pill nf">Non fatto</span>'}[st];
+    return `<tr><td><strong>${esc(e.titolo)}</strong></td><td>${pill}</td>
+      <td class="muted">${v&&v.descrizione?esc(v.descrizione):'—'}</td></tr>`;
+  }).join('');
+  // voci di elementi non più in checklist ma presenti nel rapporto (storico)
+  const extra=r._voci.filter(v=>!els.some(e=>e.id===v.elemento_id));
+  extra.forEach(v=>{rows+=`<tr><td><strong>${esc(v.titolo_snapshot)}</strong> <span class="muted">(fuori checklist)</span></td>
+    <td>${v.stato==='ok'?'<span class="pill ok">OK</span>':v.stato==='ko'?'<span class="pill ko">KO</span>':'<span class="pill nf">Non fatto</span>'}</td>
+    <td class="muted">${v.descrizione?esc(v.descrizione):'—'}</td></tr>`;});
+  const body=`
+    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px;font-size:13.5px">
+      <div><span class="muted">Sede</span><br><strong>${esc(nomeSede(r.sede_id))}</strong></div>
+      <div><span class="muted">Data</span><br><strong>${fmtData(r.data)}</strong></div>
+      <div><span class="muted">Incaricato</span><br><strong>${esc(nomeUtente(r.incaricato_id))}</strong></div>
+      <div><span class="muted">Stato</span><br>${r.stato==='annullato'?'<span class="pill ko">Annullato</span>':'<span class="pill on">Attivo</span>'}</div>
+    </div>
+    ${r.note?`<div class="panel" style="margin:0 0 16px"><strong>Note:</strong> ${esc(r.note)}</div>`:''}
+    <div class="tbl-wrap"><table><thead><tr><th>Elemento</th><th>Esito</th><th>Descrizione</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  let foot='';
+  if(isAdmin()){
+    foot = r.stato==='annullato'
+      ? `<button class="btn btn-ghost" onclick="setRapStato('${r.id}','attivo')">Ripristina</button>`
+      : `<button class="btn btn-danger" onclick="setRapStato('${r.id}','annullato')">Annulla rapporto</button>`;
+  }
+  foot+=`<button class="btn btn-ghost" onclick="closeModal()">Chiudi</button>`;
+  openModal(`Rapporto del ${fmtDataBreve(r.data)}`,body,foot,true);
+}
+async function setRapStato(id,stato){
+  try{
+    await db('PATCH',T('rapporti'),{flt:`id=eq.${id}`,body:{stato}});
+    await logAz(stato==='annullato'?'rapporto_annullato':'rapporto_ripristinato',id);
+    toast(stato==='annullato'?'Rapporto annullato':'Rapporto ripristinato','ok');
+    closeModal(); loadRapporti();
+  }catch(e){toast('Operazione non riuscita','err');}
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  PAGINA — MATRICE (confronto rapporti affiancati per sede)
+// ════════════════════════════════════════════════════════════════════════
+const FM={sede:'',da:isoMinus(365),a:''};
+async function renderMatrice(){
+  if(!FM.sede && S.sedi.length) FM.sede=S.sedi[0].id;
+  $('main').innerHTML=`
+    <div class="page-head"><div><h2>Confronto sede</h2>
+      <div class="desc">Rapporti affiancati: più recente a sinistra. Default ultimo anno.</div></div></div>
+    <div class="panel"><div class="filters">
+      <div class="f"><label>Sede</label><select id="fm-sede" onchange="FM.sede=this.value;loadMatrice()">${
+        S.sedi.map(s=>`<option value="${s.id}" ${s.id===FM.sede?'selected':''}>${esc(s.nome)}</option>`).join('')}</select></div>
+      <div class="f"><label>Da</label><input type="date" id="fm-da" value="${FM.da}" onchange="FM.da=this.value;loadMatrice()"></div>
+      <div class="f"><label>A</label><input type="date" id="fm-a" value="${FM.a}" onchange="FM.a=this.value;loadMatrice()"></div>
+      <button class="btn btn-ghost btn-sm" onclick="FM.da='';FM.a='';renderMatrice()">Tutto lo storico</button>
+      <button class="btn btn-ghost btn-sm" onclick="FM.da=isoMinus(365);FM.a='';renderMatrice()">Ultimo anno</button>
+    </div></div>
+    <div id="mx-body"></div>`;
+  await loadMatrice();
+}
+async function loadMatrice(){
+  $('mx-body').innerHTML=`<div class="panel"><span class="spn spn-d"></span> Carico…</div>`;
+  if(!FM.sede){$('mx-body').innerHTML=`<div class="tbl-wrap"><div class="empty"><div class="et">Nessuna sede</div></div></div>`;return;}
+  const flts=[`sede_id=eq.${FM.sede}`,`stato=eq.attivo`];
+  if(FM.da) flts.push(`data=gte.${FM.da}`);
+  if(FM.a) flts.push(`data=lte.${FM.a}`);
+  const raps=await db('GET',T('rapporti'),{flt:flts.join('&'),ord:'data.desc,created_at.desc'});
+  const ids=raps.map(r=>r.id);
+  let voci=[];
+  if(ids.length) voci=await db('GET',T('voci'),{flt:`rapporto_id=in.(${ids.join(',')})`});
+  const byR={}; voci.forEach(v=>{(byR[v.rapporto_id]||(byR[v.rapporto_id]={}))[v.elemento_id]=v;});
+  raps.forEach(r=>r._vById=byR[r.id]||{});
+  drawMatrice(raps);
+}
+function drawMatrice(raps){
+  const els=elementiSede(FM.sede);
+  if(!els.length){$('mx-body').innerHTML=`<div class="tbl-wrap"><div class="empty"><div class="et">Checklist vuota per questa sede</div><div>Configurala in "Checklist"</div></div></div>`;return;}
+  if(!raps.length){$('mx-body').innerHTML=`<div class="tbl-wrap"><div class="empty"><div class="et">Nessun rapporto nel periodo</div><div>Allarga l'intervallo di date</div></div></div>`;return;}
+  let head=`<th class="el-h">Elemento</th>`;
+  raps.forEach(r=>{head+=`<th><div class="rd">${fmtDataBreve(r.data)}</div><div class="rw">${esc(nomeUtente(r.incaricato_id))}</div></th>`;});
+  let rows='';
+  els.forEach(e=>{
+    let cells='';
+    raps.forEach(r=>{
+      const v=r._vById[e.id];
+      const st=v?v.stato:'non_fatto';
+      if(st==='ok') cells+=`<td class="cell ok" title="${esc(v.descrizione||'OK')}"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 6"/></svg></div>${v.descrizione?`<div class="note">${esc(v.descrizione)}</div>`:''}</td>`;
+      else if(st==='ko') cells+=`<td class="cell ko" title="${esc(v.descrizione||'KO')}"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>${v.descrizione?`<div class="note">${esc(v.descrizione)}</div>`:''}</td>`;
+      else cells+=`<td class="cell nf"><span class="dash">–</span></td>`;
+    });
+    rows+=`<tr><td class="el-c">${esc(e.titolo)}</td>${cells}</tr>`;
+  });
+  $('mx-body').innerHTML=`<div class="matrix-wrap"><div class="matrix-scroll">
+    <table class="matrix"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="matrix-foot">
+      <span>${raps.length} rapport${raps.length===1?'o':'i'} · ${els.length} element${els.length===1?'o':'i'}</span>
+      <span class="lgnd"><span class="sw" style="background:var(--ok)"></span> OK</span>
+      <span class="lgnd"><span class="sw" style="background:var(--ko)"></span> KO</span>
+      <span class="lgnd"><span class="sw" style="background:var(--g200)"></span> Non fatto</span>
+    </div></div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  PAGINA — CHECKLIST (elementi globali + esclusioni per sede)
+// ════════════════════════════════════════════════════════════════════════
+let _clTab='elementi', _clSede='';
+function renderChecklist(){
+  $('main').innerHTML=`
+    <div class="page-head"><div><h2>Checklist</h2>
+      <div class="desc">Elementi globali da controllare e configurazione per sede</div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="openElemModal()">+ Nuovo elemento</button></div></div>
+    <div class="panel" style="padding:6px;display:flex;gap:4px;width:fit-content">
+      <button class="tn-item ${_clTab==='elementi'?'active':''}" onclick="_clTab='elementi';renderChecklist()">Elementi globali</button>
+      <button class="tn-item ${_clTab==='sede'?'active':''}" onclick="_clTab='sede';renderChecklist()">Configura per sede</button>
+    </div>
+    <div id="cl-body"></div>`;
+  if(_clTab==='elementi') drawElementi(); else drawSedeConfig();
+}
+function drawElementi(){
+  const list=S.elementi;
+  if(!list.length){$('cl-body').innerHTML=`<div class="tbl-wrap"><div class="empty"><div class="et">Nessun elemento</div><div>Aggiungi il primo con "+ Nuovo elemento"</div></div></div>`;return;}
+  let h=`<div class="tbl-wrap"><table><thead><tr><th style="width:40px">#</th><th>Titolo</th><th>Nota</th><th>Stato</th><th></th></tr></thead><tbody>`;
+  list.forEach((e,i)=>{
+    h+=`<tr class="${e.attivo?'':'row-annullata'}">
+      <td class="muted">${i+1}</td>
+      <td><strong>${esc(e.titolo)}</strong></td>
+      <td class="muted">${e.descrizione?esc(e.descrizione):'—'}</td>
+      <td>${e.attivo?'<span class="pill on">Attivo</span>':'<span class="pill off">Ritirato</span>'}</td>
+      <td>
+        <button class="linkact" onclick="openElemModal('${e.id}')">Modifica</button>
+        ${i>0?`<button class="linkact" onclick="moveElem('${e.id}',-1)" title="Su">▲</button>`:''}
+        ${i<list.length-1?`<button class="linkact" onclick="moveElem('${e.id}',1)" title="Giù">▼</button>`:''}
+      </td></tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  $('cl-body').innerHTML=h;
+}
+function openElemModal(id){
+  const e=id?S.elementi.find(x=>x.id===id):null;
+  const body=`
+    <div class="field"><label>Titolo *</label><input id="el-titolo" value="${e?esc(e.titolo):''}" placeholder="Es. Estintori a norma"></div>
+    <div class="field"><label>Nota / istruzione (opzionale)</label><textarea id="el-desc" rows="2" placeholder="Aiuto per chi compila">${e?esc(e.descrizione||''):''}</textarea></div>
+    ${e?`<label class="chk"><input type="checkbox" id="el-attivo" ${e.attivo?'checked':''}> Attivo nella checklist</label>`:''}`;
+  const foot=`<button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+    <button class="btn btn-primary" id="el-save" onclick="saveElem('${id||''}')">Salva</button>`;
+  openModal(e?'Modifica elemento':'Nuovo elemento',body,foot);
+}
+async function saveElem(id){
+  const titolo=$('el-titolo').value.trim();
+  if(!titolo){toast('Il titolo è obbligatorio','err');return;}
+  const desc=$('el-desc').value.trim()||null;
+  const btn=$('el-save');btn.innerHTML='<span class="spn"></span>';btn.disabled=true;
+  try{
+    if(id){
+      const attivo=$('el-attivo')?$('el-attivo').checked:true;
+      const [u]=await db('PATCH',T('elementi'),{flt:`id=eq.${id}`,body:{titolo,descrizione:desc,attivo}});
+      Object.assign(S.elementi.find(x=>x.id===id),u);
+      await logAz('elemento_modificato',titolo);
+    }else{
+      const ordine=(S.elementi.reduce((m,e)=>Math.max(m,e.ordine),0))+1;
+      const [n]=await db('POST',T('elementi'),{body:{titolo,descrizione:desc,ordine,created_by:S.user.id}});
+      S.elementi.push(n);
+      await logAz('elemento_creato',titolo);
+    }
+    S.elementi.sort((a,b)=>a.ordine-b.ordine);
+    toast('Elemento salvato','ok');closeModal();renderChecklist();
+  }catch(e){toast('Salvataggio non riuscito','err');btn.innerHTML='Salva';btn.disabled=false;}
+}
+async function moveElem(id,dir){
+  const list=S.elementi;const i=list.findIndex(e=>e.id===id);const j=i+dir;
+  if(j<0||j>=list.length)return;
+  const a=list[i],b=list[j];const ao=a.ordine,bo=b.ordine;
+  try{
+    await db('PATCH',T('elementi'),{flt:`id=eq.${a.id}`,body:{ordine:bo}});
+    await db('PATCH',T('elementi'),{flt:`id=eq.${b.id}`,body:{ordine:ao}});
+    a.ordine=bo;b.ordine=ao;S.elementi.sort((x,y)=>x.ordine-y.ordine);
+    drawElementi();
+  }catch(e){toast('Riordino non riuscito','err');}
+}
+function drawSedeConfig(){
+  if(!_clSede && S.sedi.length)_clSede=S.sedi[0].id;
+  const ex=S.esclusioni[_clSede]||new Set();
+  const attivi=elementiAttivi();
+  let rows=attivi.map(e=>{
+    const incluso=!ex.has(e.id);
+    return `<div class="el-row">
+      <label class="chk" style="flex:1">
+        <input type="checkbox" ${incluso?'checked':''} onchange="toggleEsclusione('${_clSede}','${e.id}',this.checked)">
+        <span class="et">${esc(e.titolo)}</span>
+      </label>
+      ${incluso?'<span class="pill on">In checklist</span>':'<span class="pill off">Escluso</span>'}
+    </div>`;
+  }).join('');
+  $('cl-body').innerHTML=`
+    <div class="panel"><div class="filters">
+      <div class="f"><label>Sede</label><select onchange="_clSede=this.value;renderChecklist()">${
+        S.sedi.map(s=>`<option value="${s.id}" ${s.id===_clSede?'selected':''}>${esc(s.nome)}</option>`).join('')}</select></div>
+    </div></div>
+    <div class="panel"><p class="desc" style="margin-bottom:14px">Disattiva gli elementi che non si applicano a questa sede. Restano attivi globalmente.</p>
+      <div class="el-list">${rows||'<div class="muted">Nessun elemento attivo</div>'}</div></div>`;
+}
+async function toggleEsclusione(sedeId,elemId,incluso){
+  try{
+    if(incluso){
+      await db('DELETE',T('sede_esclusioni'),{flt:`sede_id=eq.${sedeId}&elemento_id=eq.${elemId}`});
+      S.esclusioni[sedeId]&&S.esclusioni[sedeId].delete(elemId);
+    }else{
+      await db('POST',T('sede_esclusioni'),{body:{sede_id:sedeId,elemento_id:elemId,created_by:S.user.id}});
+      (S.esclusioni[sedeId]||(S.esclusioni[sedeId]=new Set())).add(elemId);
+    }
+    drawSedeConfig();
+  }catch(e){toast('Modifica non riuscita','err');drawSedeConfig();}
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  PAGINA — PROFILI (admin)
+// ════════════════════════════════════════════════════════════════════════
+function renderProfili(){
+  let rows=S.profili.map(p=>`<tr class="${p.attivo?'':'row-annullata'}">
+    <td><strong>${esc(`${p.nome} ${p.cognome}`.trim()||'—')}</strong></td>
+    <td class="muted">${esc(p.email)}</td>
+    <td><span class="pill ${p.ruolo}">${p.ruolo}</span></td>
+    <td>${p.attivo?'<span class="pill on">Attivo</span>':'<span class="pill off">Disattivo</span>'}</td>
+    <td>${p.geo_consenso===false?'<button class="linkact" onclick="resetGeo(\''+p.id+'\')">Reset geo</button>':p.geo_consenso===true?'<span class="muted">concesso</span>':'<span class="muted">—</span>'}</td>
+    <td><button class="linkact" onclick="openUserModal('${p.id}')">Modifica</button></td>
+  </tr>`).join('');
+  $('main').innerHTML=`
+    <div class="page-head"><div><h2>Profili di accesso</h2>
+      <div class="desc">Utenti del tool e relativi permessi</div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="openUserModal()">+ Nuovo utente</button></div></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Email</th><th>Ruolo</th><th>Stato</th><th>Geo</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" class="empty">Nessun utente</td></tr>'}</tbody></table></div>`;
+}
+function openUserModal(id){
+  const p=id?S.profById[id]:null;
+  const body=`
+    <div class="row2">
+      <div class="field"><label>Nome</label><input id="u-nome" value="${p?esc(p.nome):''}"></div>
+      <div class="field"><label>Cognome</label><input id="u-cognome" value="${p?esc(p.cognome):''}"></div>
+    </div>
+    <div class="field"><label>E-Mail ${p?'':'*'}</label><input id="u-email" type="email" value="${p?esc(p.email):''}" ${p?'disabled style="background:var(--g100)"':''}></div>
+    <div class="row2">
+      <div class="field"><label>Ruolo</label><select id="u-ruolo">
+        <option value="incaricato" ${p&&p.ruolo==='incaricato'?'selected':''}>Incaricato</option>
+        <option value="admin" ${p&&p.ruolo==='admin'?'selected':''}>Admin</option></select></div>
+      <div class="field"><label>Stato</label><select id="u-attivo">
+        <option value="true" ${!p||p.attivo?'selected':''}>Attivo</option>
+        <option value="false" ${p&&!p.attivo?'selected':''}>Disattivo</option></select></div>
+    </div>
+    <div class="field"><label>Password ${p?'(lascia vuoto per non cambiarla)':'*'}</label>
+      <input id="u-pwd" type="text" placeholder="${p?'••••••':'Almeno 8 caratteri'}"></div>`;
+  const foot=`<button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+    <button class="btn btn-primary" id="u-save" onclick="saveUser('${id||''}')">Salva</button>`;
+  openModal(p?'Modifica utente':'Nuovo utente',body,foot);
+}
+async function saveUser(id){
+  const nome=$('u-nome').value.trim(),cognome=$('u-cognome').value.trim();
+  const ruolo=$('u-ruolo').value,attivo=$('u-attivo').value==='true',pwd=$('u-pwd').value;
+  const btn=$('u-save');btn.innerHTML='<span class="spn"></span>';btn.disabled=true;
+  try{
+    if(id){
+      const payload={id,nome,cognome,ruolo,attivo};if(pwd)payload.password=pwd;
+      await callFn('update',payload);
+      await logAz('utente_modificato',`${nome} ${cognome}`.trim());
+    }else{
+      const email=$('u-email').value.trim();
+      if(!email||!pwd){toast('Email e password obbligatorie','err');btn.innerHTML='Salva';btn.disabled=false;return;}
+      const chk=await callFn('check',{email});
+      if(chk.exists){toast('Esiste già un utente con questa email','err');btn.innerHTML='Salva';btn.disabled=false;return;}
+      await callFn('create',{email,password:pwd,nome,cognome,ruolo});
+      await logAz('utente_creato',`${nome} ${cognome}`.trim());
+    }
+    await loadBase();
+    toast('Utente salvato','ok');closeModal();renderProfili();
+  }catch(e){toast(e.message||'Salvataggio non riuscito','err');btn.innerHTML='Salva';btn.disabled=false;}
+}
+async function resetGeo(id){
+  try{await db('PATCH',T('profili'),{flt:`id=eq.${id}`,body:{geo_consenso:null}});
+    S.profById[id].geo_consenso=null;toast('Consenso geo resettato','ok');renderProfili();
+  }catch(e){toast('Operazione non riuscita','err');}
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  PAGINA — LOG (admin)
+// ════════════════════════════════════════════════════════════════════════
+const FL={q:'',azione:'',da:'',a:'',page:1};
+let _log=[];
+async function renderLog(){
+  $('main').innerHTML=`
+    <div class="page-head"><div><h2>Log</h2><div class="desc">Storico delle azioni</div></div></div>
+    <div class="panel"><div class="filters">
+      <div class="f"><label>Cerca</label><input id="fl-q" value="${esc(FL.q)}" placeholder="testo libero"></div>
+      <div class="f"><label>Azione</label><select id="fl-azione"><option value="">Tutte</option></select></div>
+      <div class="f"><label>Da</label><input type="date" id="fl-da" value="${FL.da}"></div>
+      <div class="f"><label>A</label><input type="date" id="fl-a" value="${FL.a}"></div>
+      <button class="btn btn-primary btn-sm" onclick="applyLogFilters()">Filtra</button>
+      <button class="btn btn-ghost btn-sm" onclick="FL.q='';FL.azione='';FL.da='';FL.a='';FL.page=1;renderLog()">Azzera</button>
+    </div></div>
+    <div id="log-body"></div>`;
+  await loadLog();
+}
+function applyLogFilters(){FL.q=$('fl-q').value.trim();FL.azione=$('fl-azione').value;FL.da=$('fl-da').value;FL.a=$('fl-a').value;FL.page=1;drawLog();}
+async function loadLog(){
+  $('log-body').innerHTML=`<div class="panel"><span class="spn spn-d"></span> Carico…</div>`;
+  _log=await db('GET',T('log'),{ord:'created_at.desc',lim:'2000'});
+  const azioni=[...new Set(_log.map(l=>l.azione))].sort();
+  const sel=$('fl-azione');
+  if(sel) sel.innerHTML=`<option value="">Tutte</option>`+azioni.map(a=>`<option value="${esc(a)}" ${a===FL.azione?'selected':''}>${esc(a)}</option>`).join('');
+  drawLog();
+}
+function drawLog(){
+  let rows=_log.filter(l=>{
+    if(FL.azione&&l.azione!==FL.azione)return false;
+    if(FL.da&&l.created_at.slice(0,10)<FL.da)return false;
+    if(FL.a&&l.created_at.slice(0,10)>FL.a)return false;
+    if(FL.q){const hay=`${l.utente_nome||''} ${l.azione} ${l.dettaglio||''}`.toLowerCase();
+      if(!hay.includes(FL.q.toLowerCase()))return false;}
+    return true;
+  });
+  const PER=30,pages=Math.max(1,Math.ceil(rows.length/PER));
+  if(FL.page>pages)FL.page=pages;
+  const slice=rows.slice((FL.page-1)*PER,FL.page*PER);
+  if(!rows.length){$('log-body').innerHTML=`<div class="tbl-wrap"><div class="empty"><div class="et">Nessuna voce</div></div></div>`;return;}
+  let h=`<div class="tbl-wrap"><table><thead><tr><th>Data e ora</th><th>Utente</th><th>Azione</th><th>Dettaglio</th></tr></thead><tbody>`;
+  slice.forEach(l=>{h+=`<tr><td>${fmtTS(l.created_at)}</td><td>${esc(l.utente_nome||'—')}</td>
+    <td><span class="pill incaricato">${esc(l.azione)}</span></td><td class="muted">${esc(l.dettaglio||'—')}</td></tr>`;});
+  h+=`</tbody></table>`;
+  if(pages>1){h+=`<div class="pager">
+    <button onclick="FL.page=${FL.page-1};drawLog()" ${FL.page<=1?'disabled':''}>‹ Prec</button>
+    <span class="pinfo">Pagina ${FL.page} di ${pages} · ${rows.length} voci</span>
+    <button onclick="FL.page=${FL.page+1};drawLog()" ${FL.page>=pages?'disabled':''}>Succ ›</button></div>`;}
+  h+=`</div>`;
+  $('log-body').innerHTML=h;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════════════════
+(function init(){
+  $('loader').classList.add('hid');
+  $('login').classList.remove('hid');
+  $('li-pwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+})();
+
+</script>
+</body>
+</html>
