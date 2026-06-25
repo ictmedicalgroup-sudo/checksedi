@@ -137,6 +137,11 @@ input,select,textarea{font-size:16px!important}
 .cl-item .ci-body{flex:1;min-width:0}
 .cl-item .ci-ttl{font-size:15px;font-weight:700;color:var(--g900);margin-bottom:2px}
 .cl-item .ci-last{font-size:12px;color:var(--grigio);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag-esito{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;
+  padding:2px 8px;border-radius:99px;letter-spacing:.3px;vertical-align:middle}
+.tag-esito.ok{background:var(--ok-bg);color:var(--ok)}
+.tag-esito.ko{background:var(--ko-bg);color:var(--ko)}
+.tag-esito.nf{background:var(--g100);color:var(--g500)}
 .cl-item .ci-state{flex:0 0 auto;width:26px;height:26px;border-radius:50%;
   display:flex;align-items:center;justify-content:center}
 .cl-item .ci-state svg{width:16px;height:16px;stroke:#fff;stroke-width:3}
@@ -333,6 +338,12 @@ function initials(u){const a=(u?.nome||'').trim()[0]||'';const b=(u?.cognome||''
 const MESI=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
 function fmtData(d){if(!d)return'';const[y,m,g]=d.split('-');return `${+g} ${MESI[+m-1]} ${y}`;}
 function fmtDataBreve(d){if(!d)return'';const[y,m,g]=d.split('-');return `${+g}/${+m}/${String(y).slice(2)}`;}
+function fmtOra(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});}
+function tagEsito(stato){
+  if(stato==='ok') return `<span class="tag-esito ok">OK</span>`;
+  if(stato==='ko') return `<span class="tag-esito ko">KO</span>`;
+  return `<span class="tag-esito nf">NON FATTO</span>`;
+}
 function oggiISO(){const d=new Date();const off=d.getTimezoneOffset();
   const loc=new Date(d.getTime()-off*60000);return loc.toISOString().slice(0,10);}
 
@@ -548,7 +559,7 @@ function renderRapporti(){
     const who=r._prof?`${r._prof.nome} ${r._prof.cognome}`.trim():'—';
     h+=`<div class="rapp ${r.stato==='annullato'?'annullato':''}">
       <div class="rapp-top">
-        <div><div class="rapp-date">${fmtData(r.data)}</div><div class="rapp-who">${esc(who)}</div></div>
+        <div><div class="rapp-date">${fmtData(r.data)}${r.created_at?` <span style="font-size:12.5px;font-weight:600;color:var(--grigio)">ore ${fmtOra(r.created_at)}</span>`:''}</div><div class="rapp-who">${esc(who)}</div></div>
         ${r.stato==='annullato'?'<span class="badge dt">Annullato</span>':''}
       </div>
       <div class="tally">
@@ -573,7 +584,7 @@ function ultimoControlloPerSede(sedeId){
     if(r.stato==='annullato') continue;
     for(const v of r._voci){
       if(!out[v.elemento_id] && v.stato!=='non_fatto'){
-        out[v.elemento_id]={descrizione:v.descrizione,data:r.data,stato:v.stato};
+        out[v.elemento_id]={descrizione:v.descrizione,data:r.data,created_at:r.created_at,stato:v.stato};
       }
     }
   }
@@ -602,8 +613,8 @@ function renderNuovo(){
       else if(v.stato==='ko'){cls='done-ko';stateCls='s-ko';icon='<path d="M6 6l12 12M18 6L6 18"/>';}
     }
     const lastTxt = last
-      ? `Ultimo: ${last.stato==='ok'?'OK':'KO'} · ${fmtDataBreve(last.data)}${last.descrizione?' · '+esc(last.descrizione):''}`
-      : 'Mai controllato';
+      ? `${tagEsito(last.stato)} <span style="color:var(--grigio)">${fmtDataBreve(last.data)}${last.created_at?' · '+fmtOra(last.created_at):''}${last.descrizione?' · '+esc(last.descrizione):''}</span>`
+      : '<span style="color:var(--g300)">Mai controllato</span>';
     h+=`<div class="cl-item ${cls}" onclick="openVoce('${e.id}')">
       <div class="ci-body">
         <div class="ci-ttl">${esc(e.titolo)}</div>
@@ -630,7 +641,7 @@ function openVoce(elemId){
   const last=S.flow.ultimo[elemId];
   $('m-titolo').textContent=e.titolo;
   $('m-last').innerHTML = last
-    ? `<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Ultimo controllo: ${fmtData(last.data)} (${last.stato==='ok'?'OK':'KO'})`
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Ultimo controllo: ${fmtData(last.data)}${last.created_at?' · '+fmtOra(last.created_at):''} ${tagEsito(last.stato)}`
     : `<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Mai controllato in precedenza`;
   // precompila: se c'è già una voce in corso usa quella, altrimenti l'ultimo controllo
   const descPrecomp = existing ? existing.descrizione : (last ? last.descrizione : '');
