@@ -164,6 +164,15 @@ table.matrix td.cell.nf{background:repeating-linear-gradient(45deg,#fff,#fff 5px
 .email-info.ok{background:var(--ok-bg);color:var(--ok)}
 .email-info.new{background:var(--verde-xl);color:var(--verde-d)}
 .email-info.err{background:var(--red-l);color:var(--red)}
+.st-group{display:inline-flex;gap:4px}
+.st-btn{padding:5px 11px;border:1.5px solid var(--g200);background:#fff;border-radius:var(--rsm);
+  font-weight:700;font-size:12.5px;color:var(--g500);cursor:pointer;transition:all .12s}
+.st-btn.ok.on{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
+.st-btn.ko.on{border-color:var(--ko);background:var(--ko-bg);color:var(--ko)}
+.st-btn.nf.on{border-color:var(--g300);background:var(--g100);color:var(--g700)}
+.rd-desc{width:100%;padding:7px 10px;border:1.5px solid var(--g200);border-radius:var(--rsm);
+  background:var(--g50);font-size:13px}
+.rd-desc:focus{outline:none;border-color:var(--verde);background:#fff}
 .toggle{display:flex;gap:10px}
 .tg-opt{flex:1;padding:12px;border:2px solid var(--g200);border-radius:var(--rsm);background:#fff;cursor:pointer;
   text-align:center;font-weight:700;color:var(--g500);transition:all .14s}
@@ -468,18 +477,31 @@ function drawRapTable(){
 }
 function rapPage(p){FR.page=p;drawRapTable();window.scrollTo({top:0,behavior:'smooth'});}
 
+function rapStateBtns(elemId,stato){
+  const mk=(val,lab,cls)=>`<button type="button" class="st-btn ${cls} ${stato===val?'on':''}" onclick="pickStato('${elemId}','${val}')">${lab}</button>`;
+  return `<div class="st-group" data-elem="${elemId}" data-stato="${stato}">
+    ${mk('ok','OK','ok')}${mk('ko','KO','ko')}${mk('non_fatto','—','nf')}</div>`;
+}
+function pickStato(elemId,val){
+  const g=document.querySelector(`.st-group[data-elem="${elemId}"]`); if(!g)return;
+  g.dataset.stato=val;
+  g.querySelectorAll('.st-btn').forEach(b=>b.classList.remove('on'));
+  const idx={ok:0,ko:1,non_fatto:2}[val];
+  g.querySelectorAll('.st-btn')[idx].classList.add('on');
+}
 function openRapDetail(id){
   const r=_rapporti.find(x=>x.id===id); if(!r)return;
   const els=elementiSede(r.sede_id);
   const vById={}; r._voci.forEach(v=>vById[v.elemento_id]=v);
+  const annull = r.stato==='annullato';
   let rows=els.map(e=>{
     const v=vById[e.id];
     const st=v?v.stato:'non_fatto';
-    const pill={ok:'<span class="pill ok">OK</span>',ko:'<span class="pill ko">KO</span>',non_fatto:'<span class="pill nf">Non fatto</span>'}[st];
-    return `<tr><td><strong>${esc(e.titolo)}</strong></td><td>${pill}</td>
-      <td class="muted">${v&&v.descrizione?esc(v.descrizione):'—'}</td></tr>`;
+    return `<tr><td><strong>${esc(e.titolo)}</strong></td>
+      <td>${rapStateBtns(e.id,st)}</td>
+      <td><input class="rd-desc" data-elem="${e.id}" value="${v&&v.descrizione?esc(v.descrizione):''}" placeholder="—"></td></tr>`;
   }).join('');
-  // voci di elementi non più in checklist ma presenti nel rapporto (storico)
+  // voci di elementi non più in checklist: mostrate in sola lettura (storico)
   const extra=r._voci.filter(v=>!els.some(e=>e.id===v.elemento_id));
   extra.forEach(v=>{rows+=`<tr><td><strong>${esc(v.titolo_snapshot)}</strong> <span class="muted">(fuori checklist)</span></td>
     <td>${v.stato==='ok'?'<span class="pill ok">OK</span>':v.stato==='ko'?'<span class="pill ko">KO</span>':'<span class="pill nf">Non fatto</span>'}</td>
@@ -489,24 +511,80 @@ function openRapDetail(id){
       <div><span class="muted">Sede</span><br><strong>${esc(nomeSede(r.sede_id))}</strong></div>
       <div><span class="muted">Data</span><br><strong>${fmtData(r.data)}</strong></div>
       <div><span class="muted">Incaricato</span><br><strong>${esc(nomeUtente(r.incaricato_id))}</strong></div>
-      <div><span class="muted">Stato</span><br>${r.stato==='annullato'?'<span class="pill ko">Annullato</span>':'<span class="pill on">Attivo</span>'}</div>
+      <div><span class="muted">Stato</span><br>${annull?'<span class="pill ko">Annullato</span>':'<span class="pill on">Attivo</span>'}</div>
     </div>
-    ${r.note?`<div class="panel" style="margin:0 0 16px"><strong>Note:</strong> ${esc(r.note)}</div>`:''}
-    <div class="tbl-wrap"><table><thead><tr><th>Elemento</th><th>Esito</th><th>Descrizione</th></tr></thead>
-      <tbody>${rows}</tbody></table></div>`;
-  let foot='';
-  if(isAdmin()){
-    foot = r.stato==='annullato'
-      ? `<button class="btn btn-ghost" onclick="setRapStato('${r.id}','attivo')">Ripristina</button>`
-      : `<button class="btn btn-danger" onclick="setRapStato('${r.id}','annullato')">Annulla rapporto</button>`;
-  }
-  foot+=`<button class="btn btn-ghost" onclick="closeModal()">Chiudi</button>`;
+    <div class="field" style="margin-bottom:16px"><label>Nota del rapporto</label>
+      <textarea id="rd-note" rows="2" placeholder="Nota generale (opzionale)">${r.note?esc(r.note):''}</textarea></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Elemento</th><th style="width:170px">Esito</th><th>Descrizione</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    ${annull?'<div class="muted" style="margin-top:12px;font-size:12.5px">Rapporto annullato: ripristinalo per renderlo di nuovo conteggiabile.</div>':''}`;
+  let foot=`<button class="btn btn-ghost" onclick="closeModal()">Chiudi</button>`;
+  foot+= annull
+    ? `<button class="btn btn-ghost" onclick="setRapStato('${r.id}','attivo')">Ripristina</button>`
+    : `<button class="btn btn-danger" onclick="setRapStato('${r.id}','annullato')">Annulla rapporto</button>`;
+  foot+=`<button class="btn btn-primary" id="rd-save" onclick="saveRapDetail('${r.id}')">Salva modifiche</button>`;
   openModal(`Rapporto del ${fmtDataBreve(r.data)}`,body,foot,true);
 }
+
+async function saveRapDetail(id){
+  const r=_rapporti.find(x=>x.id===id); if(!r)return;
+  const btn=$('rd-save');btn.innerHTML='<span class="spn"></span>';btn.disabled=true;
+  try{
+    const els=elementiSede(r.sede_id);
+    const vById={}; r._voci.forEach(v=>vById[v.elemento_id]=v);
+    const newNote=$('rd-note').value.trim();
+    const diffs=[];
+
+    // nota generale
+    if((r.note||'')!==newNote) diffs.push(`nota: "${r.note||'∅'}" → "${newNote||'∅'}"`);
+
+    // voci: confronto stato e descrizione per ogni elemento in checklist
+    const toUpsert=[], toDelete=[];
+    for(const e of els){
+      const g=document.querySelector(`.st-group[data-elem="${e.id}"]`);
+      const desc=(document.querySelector(`.rd-desc[data-elem="${e.id}"]`)?.value||'').trim();
+      const nuovo=g?g.dataset.stato:'non_fatto';
+      const old=vById[e.id];
+      const oldStato=old?old.stato:'non_fatto';
+      const oldDesc=old&&old.descrizione?old.descrizione:'';
+      if(nuovo==='non_fatto'){
+        if(old){ toDelete.push(old.id); diffs.push(`${e.titolo}: ${lblStato(oldStato)} → non fatto`); }
+      }else{
+        if(!old || oldStato!==nuovo || oldDesc!==desc){
+          toUpsert.push({ id:old?old.id:undefined, rapporto_id:r.id, elemento_id:e.id,
+            titolo_snapshot:e.titolo, descrizione:desc||null, stato:nuovo });
+          if(oldStato!==nuovo) diffs.push(`${e.titolo}: ${lblStato(oldStato)} → ${lblStato(nuovo)}`);
+          else if(oldDesc!==desc) diffs.push(`${e.titolo}: descrizione modificata`);
+        }
+      }
+    }
+
+    // applica: update nota
+    if((r.note||'')!==newNote)
+      await db('PATCH',T('rapporti'),{flt:`id=eq.${r.id}`,body:{note:newNote||null}});
+    // delete voci tornate a non-fatto
+    for(const vid of toDelete)
+      await db('DELETE',T('voci'),{flt:`id=eq.${vid}`});
+    // upsert voci modificate/aggiunte
+    for(const v of toUpsert){
+      if(v.id){ const {id:_,...patch}=v; await db('PATCH',T('voci'),{flt:`id=eq.${v.id}`,body:patch}); }
+      else { const {id:_,...ins}=v; await db('POST',T('voci'),{body:ins}); }
+    }
+
+    if(!diffs.length){ toast('Nessuna modifica da salvare'); btn.innerHTML='Salva modifiche';btn.disabled=false; return; }
+    await logAz('rapporto_modificato', `${nomeSede(r.sede_id)} ${fmtDataBreve(r.data)} — ${diffs.join(' · ')}`);
+    toast('Modifiche salvate','ok');
+    closeModal(); loadRapporti();
+  }catch(e){toast('Salvataggio non riuscito','err');btn.innerHTML='Salva modifiche';btn.disabled=false;}
+}
+function lblStato(s){return {ok:'OK',ko:'KO',non_fatto:'non fatto'}[s]||s;}
+
 async function setRapStato(id,stato){
+  const r=_rapporti.find(x=>x.id===id);
   try{
     await db('PATCH',T('rapporti'),{flt:`id=eq.${id}`,body:{stato}});
-    await logAz(stato==='annullato'?'rapporto_annullato':'rapporto_ripristinato',id);
+    const det=r?`${nomeSede(r.sede_id)} ${fmtDataBreve(r.data)}`:id;
+    await logAz(stato==='annullato'?'rapporto_annullato':'rapporto_ripristinato', `${det}: attivo→${stato==='annullato'?'annullato':'attivo'}`);
     toast(stato==='annullato'?'Rapporto annullato':'Rapporto ripristinato','ok');
     closeModal(); loadRapporti();
   }catch(e){toast('Operazione non riuscita','err');}
