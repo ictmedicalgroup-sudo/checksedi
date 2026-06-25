@@ -158,6 +158,12 @@ table.matrix td.cell.nf{background:repeating-linear-gradient(45deg,#fff,#fff 5px
 .mbody{padding:20px 24px;overflow-y:auto}
 .mfoot{padding:16px 24px;border-top:1px solid var(--g100);display:flex;gap:10px;justify-content:flex-end}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.email-info{display:none;margin-top:7px;padding:8px 11px;border-radius:var(--rsm);font-size:12.5px;font-weight:600;line-height:1.35}
+.email-info.show{display:block}
+.email-info.wait{background:var(--g100);color:var(--g700)}
+.email-info.ok{background:var(--ok-bg);color:var(--ok)}
+.email-info.new{background:var(--verde-xl);color:var(--verde-d)}
+.email-info.err{background:var(--red-l);color:var(--red)}
 .toggle{display:flex;gap:10px}
 .tg-opt{flex:1;padding:12px;border:2px solid var(--g200);border-radius:var(--rsm);background:#fff;cursor:pointer;
   text-align:center;font-weight:700;color:var(--g500);transition:all .14s}
@@ -307,8 +313,8 @@ async function callFn(action,payload){
   const res=await fetch(`${CFG.FN}/checksedi-manage-user`,{
     method:'POST',headers:{'apikey':CFG.KEY,'Authorization':`Bearer ${S.token}`,'Content-Type':'application/json'},
     body:JSON.stringify({action,...payload})});
-  const data=await res.json();
-  if(!res.ok) throw new Error(data.error||'Errore funzione');
+  const data=await res.json().catch(()=>({ok:false,error:'Risposta non valida'}));
+  if(!res.ok || data.ok===false) throw new Error(data.error||'Errore funzione');
   return data;
 }
 async function logAz(azione,dettaglio){
@@ -701,12 +707,16 @@ function renderProfili(){
 }
 function openUserModal(id){
   const p=id?S.profById[id]:null;
+  const isNew=!p;
   const body=`
     <div class="row2">
       <div class="field"><label>Nome</label><input id="u-nome" value="${p?esc(p.nome):''}"></div>
       <div class="field"><label>Cognome</label><input id="u-cognome" value="${p?esc(p.cognome):''}"></div>
     </div>
-    <div class="field"><label>E-Mail ${p?'':'*'}</label><input id="u-email" type="email" value="${p?esc(p.email):''}" ${p?'disabled style="background:var(--g100)"':''}></div>
+    <div class="field"><label>E-Mail ${isNew?'*':''}</label>
+      <input id="u-email" type="email" autocomplete="off" value="${p?esc(p.email):''}" ${isNew?'placeholder="nome@medicalgroup.it"':'disabled style="background:var(--g100);color:var(--g500)"'}>
+      <div id="u-email-info" class="email-info"></div>
+    </div>
     <div class="row2">
       <div class="field"><label>Ruolo</label><select id="u-ruolo">
         <option value="incaricato" ${p&&p.ruolo==='incaricato'?'selected':''}>Incaricato</option>
@@ -715,16 +725,64 @@ function openUserModal(id){
         <option value="true" ${!p||p.attivo?'selected':''}>Attivo</option>
         <option value="false" ${p&&!p.attivo?'selected':''}>Disattivo</option></select></div>
     </div>
-    <div class="field"><label>Password ${p?'(lascia vuoto per non cambiarla)':'*'}</label>
-      <input id="u-pwd" type="text" placeholder="${p?'••••••':'Almeno 8 caratteri'}"></div>`;
-  const foot=`<button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
-    <button class="btn btn-primary" id="u-save" onclick="saveUser('${id||''}')">Salva</button>`;
+    <div class="field" id="u-pwd-wrap">
+      <label>Password ${isNew?'*':'(lascia vuoto per non cambiarla)'}</label>
+      <input id="u-pwd" type="text" autocomplete="new-password" placeholder="${isNew?'Almeno 8 caratteri':'••••••'}">
+      ${isNew?'':'<div class="muted" style="font-size:11.5px;margin-top:5px">La password è condivisa con gli altri tool Medical Group.</div>'}
+    </div>`;
+  let foot=`<button class="btn btn-ghost" onclick="closeModal()">Annulla</button>`;
+  if(p && p.id!==S.user.id) foot+=`<button class="btn btn-danger" onclick="deleteUser('${p.id}')">Rimuovi profilo</button>`;
+  foot+=`<button class="btn btn-primary" id="u-save" onclick="saveUser('${id||''}')">Salva</button>`;
   openModal(p?'Modifica utente':'Nuovo utente',body,foot);
+
+  // Check email live solo per nuovi utenti (auth condivisa fra i tool)
+  if(isNew){
+    const emailEl=$('u-email');
+    let deb=null;
+    const doCheck=()=>checkEmailLive();
+    emailEl.addEventListener('blur',doCheck);
+    emailEl.addEventListener('input',()=>{
+      clearTimeout(deb);
+      const info=$('u-email-info'); if(info){info.style.display='none';info.dataset.exists='';}
+      if(emailEl.value.includes('@')&&emailEl.value.includes('.')) deb=setTimeout(doCheck,600);
+    });
+  }
 }
+
+// Verifica live se l'email esiste già in Auth: se sì, nasconde la password.
+async function checkEmailLive(){
+  const emailEl=$('u-email'), info=$('u-email-info'), pwdWrap=$('u-pwd-wrap'), pwd=$('u-pwd');
+  if(!emailEl||!info) return;
+  const email=emailEl.value.trim();
+  info.dataset.exists='';
+  if(!email||!email.includes('@')||!email.includes('.')){info.style.display='none';return;}
+  info.className='email-info show wait';
+  info.textContent='Verifica in corso…';
+  try{
+    const data=await callFn('check_email',{email});
+    info.dataset.exists=data.exists?'true':'false';
+    if(data.exists){
+      info.className='email-info show ok';
+      info.textContent='✓ Utente già presente — la password resta quella degli altri tool';
+      if(pwdWrap) pwdWrap.style.display='none';
+      if(pwd){pwd.value='';pwd.disabled=true;}
+    }else{
+      info.className='email-info show new';
+      info.textContent='Nuovo utente — imposta una password per creare l\'account';
+      if(pwdWrap) pwdWrap.style.display='';
+      if(pwd) pwd.disabled=false;
+    }
+  }catch(e){
+    info.className='email-info show err';
+    info.textContent='Errore verifica: '+(e.message||'riprova');
+  }
+}
+
 async function saveUser(id){
   const nome=$('u-nome').value.trim(),cognome=$('u-cognome').value.trim();
   const ruolo=$('u-ruolo').value,attivo=$('u-attivo').value==='true',pwd=$('u-pwd').value;
   const btn=$('u-save');btn.innerHTML='<span class="spn"></span>';btn.disabled=true;
+  const fail=m=>{toast(m,'err');btn.innerHTML='Salva';btn.disabled=false;};
   try{
     if(id){
       const payload={id,nome,cognome,ruolo,attivo};if(pwd)payload.password=pwd;
@@ -732,15 +790,30 @@ async function saveUser(id){
       await logAz('utente_modificato',`${nome} ${cognome}`.trim());
     }else{
       const email=$('u-email').value.trim();
-      if(!email||!pwd){toast('Email e password obbligatorie','err');btn.innerHTML='Salva';btn.disabled=false;return;}
-      const chk=await callFn('check',{email});
-      if(chk.exists){toast('Esiste già un utente con questa email','err');btn.innerHTML='Salva';btn.disabled=false;return;}
-      await callFn('create',{email,password:pwd,nome,cognome,ruolo});
-      await logAz('utente_creato',`${nome} ${cognome}`.trim());
+      if(!email) return fail('Email obbligatoria');
+      const info=$('u-email-info');
+      // se non ho ancora l'esito del check, lo eseguo adesso
+      let exists = info && info.dataset.exists;
+      if(exists!=='true' && exists!=='false'){
+        const chk=await callFn('check_email',{email}); exists=chk.exists?'true':'false';
+      }
+      if(exists==='false' && (!pwd||pwd.length<8)) return fail('Per un nuovo utente serve una password di almeno 8 caratteri');
+      const res=await callFn('create',{email,password:pwd||undefined,nome,cognome,ruolo});
+      await logAz('utente_creato',`${nome} ${cognome}`.trim()+(res.auth_created?'':' (account già esistente)'));
     }
     await loadBase();
     toast('Utente salvato','ok');closeModal();renderProfili();
-  }catch(e){toast(e.message||'Salvataggio non riuscito','err');btn.innerHTML='Salva';btn.disabled=false;}
+  }catch(e){fail(e.message||'Salvataggio non riuscito');}
+}
+
+async function deleteUser(id){
+  if(!confirm('Rimuovere il profilo di questo utente dal tool Check Sedi?\nL\'account di accesso (condiviso con gli altri tool) NON verrà eliminato.')) return;
+  try{
+    await callFn('delete_profile',{id});
+    await logAz('utente_rimosso',nomeUtente(id));
+    await loadBase();
+    toast('Profilo rimosso','ok');closeModal();renderProfili();
+  }catch(e){toast(e.message||'Rimozione non riuscita','err');}
 }
 async function resetGeo(id){
   try{await db('PATCH',T('profili'),{flt:`id=eq.${id}`,body:{geo_consenso:null}});
