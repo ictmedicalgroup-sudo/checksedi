@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="percorso/icon-apple.png">
+<title>Check Sedi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --verde:#9DBF60; --verde-d:#7DA343; --verde-l:#D5E3B7; --verde-xl:#EEF5E3;
+  --grigio:#77797a; --navy:#4A4C4D;
+  --red:#C0392B; --red-l:#FDECEA; --red-xl:#FBE3E0;
+  --ok:#5A9E3F; --ok-bg:#E8F2DC;
+  --ko:#C0392B; --ko-bg:#FBE3E0;
+  --g50:#F8F9F8; --g100:#F0F2EE; --g200:#E2E6DF; --g300:#C8CEC4;
+  --g500:#77797a; --g700:#4A4C4D; --g900:#2A2C2D;
+  --r:12px; --rsm:8px; --rlg:18px;
+  --sh-sm:0 1px 3px rgba(74,76,77,.10);
+  --sh-md:0 4px 14px rgba(74,76,77,.12);
+  --sh-lg:0 12px 32px rgba(74,76,77,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  height:100%;width:100%;overflow:hidden;position:fixed;
+  overscroll-behavior:none;-webkit-text-size-adjust:100%;
+  font-family:'Raleway',sans-serif;background:var(--g100);color:var(--g900);
+}
+input,select,textarea,button{font-family:inherit}
+input,select,textarea{font-size:16px!important}
+.hid{display:none!important}
+
+/* ── Loading ─────────────────────────────────────────────── */
+#loader{position:fixed;inset:0;background:var(--g100);z-index:9000;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px}
+.spn{display:inline-block;width:20px;height:20px;border:2.5px solid rgba(255,255,255,.45);
+  border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-4px}
+.spn-d{border-color:var(--g300);border-top-color:var(--verde)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Toast (in ALTO) ─────────────────────────────────────── */
+#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%) translateY(-140%);
+  z-index:9500;background:var(--navy);color:#fff;padding:12px 18px;border-radius:var(--r);
+  box-shadow:var(--sh-lg);font-size:14.5px;font-weight:600;max-width:90vw;text-align:center;
+  transition:transform .28s cubic-bezier(.2,.8,.3,1)}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.err{background:var(--red)}
+#toast.ok{background:var(--verde-d)}
+
+/* ── Login ───────────────────────────────────────────────── */
+#login{position:fixed;inset:0;z-index:8000;background:linear-gradient(160deg,#fff 0%,var(--verde-xl) 100%);
+  display:flex;align-items:center;justify-content:center;padding:26px}
+.lbox{width:100%;max-width:380px}
+.logo-wrap{text-align:center;margin-bottom:30px}
+.logo-sub{font-size:13px;letter-spacing:3px;color:var(--grigio);font-weight:600;text-transform:uppercase;margin-top:6px}
+.lcard{background:#fff;border-radius:var(--rlg);box-shadow:var(--sh-lg);padding:26px 22px}
+.lcard h1{font-size:19px;font-weight:700;color:var(--g900);margin-bottom:4px}
+.lcard p.hint{font-size:13px;color:var(--grigio);margin-bottom:20px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--grigio);margin-bottom:6px}
+.field input{width:100%;padding:13px 14px;border:1.5px solid var(--g200);border-radius:var(--rsm);
+  background:var(--g50);transition:border-color .15s,background .15s}
+.field input:focus{outline:none;border-color:var(--verde);background:#fff}
+.btn{width:100%;padding:14px;border:none;border-radius:var(--rsm);font-size:15.5px;font-weight:700;
+  cursor:pointer;transition:transform .08s,background .15s}
+.btn:active{transform:scale(.985)}
+.btn-primary{background:var(--verde);color:#fff}
+.btn-primary:disabled{opacity:.6}
+.lerr{background:var(--red-l);color:var(--red);padding:11px 13px;border-radius:var(--rsm);
+  font-size:13.5px;font-weight:600;margin-bottom:14px;display:none}
+
+/* ── App shell ───────────────────────────────────────────── */
+#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--g100)}
+.topbar{flex:0 0 auto;background:#fff;box-shadow:var(--sh-sm);z-index:50;
+  display:flex;align-items:center;gap:10px;padding:max(12px,env(safe-area-inset-top)) 14px 12px;min-height:56px}
+.tb-back{width:38px;height:38px;border-radius:50%;border:none;background:var(--g100);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+.tb-back svg{width:20px;height:20px;stroke:var(--g700)}
+.tb-title{flex:1;min-width:0}
+.tb-title .t{font-size:16px;font-weight:700;color:var(--g900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-title .s{font-size:12px;color:var(--grigio);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-user{width:38px;height:38px;border-radius:50%;background:var(--verde);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:0 0 auto;cursor:pointer}
+
+.view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;padding:14px 14px 90px}
+.view.no-bottombar{padding-bottom:24px}
+
+/* ── Search / lista sedi ─────────────────────────────────── */
+.search{position:relative;margin-bottom:14px}
+.search input{width:100%;padding:13px 14px 13px 42px;border:1.5px solid var(--g200);
+  border-radius:var(--r);background:#fff}
+.search input:focus{outline:none;border-color:var(--verde)}
+.search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:var(--grigio)}
+
+.card{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);padding:15px 16px;margin-bottom:10px;
+  cursor:pointer;transition:transform .08s,box-shadow .15s;display:flex;align-items:center;gap:12px}
+.card:active{transform:scale(.99)}
+.card .body{flex:1;min-width:0}
+.card .ttl{font-size:15.5px;font-weight:700;color:var(--g900);margin-bottom:2px}
+.card .meta{font-size:12.5px;color:var(--grigio);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .chev{width:20px;height:20px;stroke:var(--g300);flex:0 0 auto}
+.sec-label{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--grigio);margin:6px 2px 10px}
+
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;
+  padding:3px 9px;border-radius:99px}
+.badge.dt{background:var(--g100);color:var(--g700)}
+.badge.cnt{background:var(--verde-xl);color:var(--verde-d)}
+
+/* ── Lista rapporti ──────────────────────────────────────── */
+.rapp{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);padding:14px 16px;margin-bottom:10px}
+.rapp.annullato{opacity:.55}
+.rapp-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.rapp-date{font-size:15px;font-weight:700;color:var(--g900)}
+.rapp-who{font-size:12.5px;color:var(--grigio);margin-top:1px}
+.tally{display:flex;gap:7px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.ko{background:var(--ko-bg);color:var(--ko)}
+.pill.nf{background:var(--g100);color:var(--g500)}
+
+.empty{text-align:center;padding:50px 24px;color:var(--grigio)}
+.empty svg{width:46px;height:46px;stroke:var(--g300);margin-bottom:12px}
+.empty .et{font-size:15px;font-weight:600;color:var(--g700);margin-bottom:4px}
+.empty .es{font-size:13px}
+
+/* ── Checklist (nuovo rapporto) ──────────────────────────── */
+.cl-item{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);padding:14px 15px;margin-bottom:9px;
+  cursor:pointer;transition:transform .08s,background .2s,box-shadow .2s;
+  display:flex;align-items:center;gap:12px;border-left:4px solid transparent}
+.cl-item:active{transform:scale(.99)}
+.cl-item.done-ok{background:var(--ok-bg);border-left-color:var(--ok)}
+.cl-item.done-ko{background:var(--ko-bg);border-left-color:var(--ko)}
+.cl-item .ci-body{flex:1;min-width:0}
+.cl-item .ci-ttl{font-size:15px;font-weight:700;color:var(--g900);margin-bottom:2px}
+.cl-item .ci-last{font-size:12px;color:var(--grigio);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-item .ci-state{flex:0 0 auto;width:26px;height:26px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center}
+.cl-item .ci-state svg{width:16px;height:16px;stroke:#fff;stroke-width:3}
+.ci-state.s-ok{background:var(--ok)}
+.ci-state.s-ko{background:var(--ko)}
+.ci-state.s-nf{background:var(--g200)}
+.ci-state.s-nf svg{stroke:var(--g500);stroke-width:2.5}
+
+/* ── Bottom bar ──────────────────────────────────────────── */
+.bottom-bar{position:absolute;left:0;right:0;bottom:0;background:#fff;
+  box-shadow:0 -4px 16px rgba(74,76,77,.10);
+  padding:12px 14px max(12px,env(safe-area-inset-bottom));display:flex;gap:10px;z-index:40}
+.bottom-bar .btn{flex:1}
+.btn-ghost{background:var(--g100);color:var(--g700)}
+.fab{position:absolute;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));
+  background:var(--verde);color:#fff;border:none;border-radius:99px;padding:14px 20px;
+  font-size:15px;font-weight:700;box-shadow:var(--sh-lg);cursor:pointer;display:flex;align-items:center;gap:8px;z-index:40}
+.fab svg{width:20px;height:20px;stroke:#fff;stroke-width:2.5}
+.fab:active{transform:scale(.97)}
+
+/* ── Modale elemento ─────────────────────────────────────── */
+#modal{position:fixed;inset:0;z-index:7000;display:none;align-items:flex-end;justify-content:center}
+#modal.show{display:flex}
+.mback{position:absolute;inset:0;background:rgba(42,44,45,.5);animation:fade .2s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.msheet{position:relative;width:100%;max-width:560px;background:#fff;
+  border-radius:var(--rlg) var(--rlg) 0 0;box-shadow:var(--sh-lg);
+  max-height:92vh;display:flex;flex-direction:column;animation:slideup .28s cubic-bezier(.2,.8,.3,1)}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.mgrip{width:38px;height:4px;border-radius:99px;background:var(--g200);margin:10px auto 4px}
+.mhead{padding:8px 20px 14px;border-bottom:1px solid var(--g100)}
+.mhead .mt{font-size:18px;font-weight:800;color:var(--g900);line-height:1.25}
+.mhead .md{font-size:12.5px;color:var(--grigio);margin-top:6px;display:flex;align-items:center;gap:6px}
+.mhead .md svg{width:14px;height:14px;stroke:var(--grigio)}
+.mbody{padding:16px 20px;overflow-y:auto;flex:1}
+.mlabel{font-size:12.5px;font-weight:700;color:var(--grigio);margin-bottom:7px;display:block;text-transform:uppercase;letter-spacing:.4px}
+.mbody textarea{width:100%;min-height:120px;padding:13px 14px;border:1.5px solid var(--g200);
+  border-radius:var(--rsm);background:var(--g50);resize:vertical;line-height:1.5}
+.mbody textarea:focus{outline:none;border-color:var(--verde);background:#fff}
+.toggle{display:flex;gap:10px;margin-top:18px}
+.tg-opt{flex:1;padding:15px;border:2px solid var(--g200);border-radius:var(--r);background:#fff;
+  cursor:pointer;text-align:center;font-weight:700;font-size:15px;color:var(--g500);
+  transition:all .14s;display:flex;align-items:center;justify-content:center;gap:8px}
+.tg-opt svg{width:20px;height:20px;stroke-width:2.5}
+.tg-opt.sel-ok{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
+.tg-opt.sel-ko{border-color:var(--ko);background:var(--ko-bg);color:var(--ko)}
+.tg-opt .dot{width:13px;height:13px;border-radius:50%;border:2px solid currentColor;flex:0 0 auto}
+.mfoot{padding:14px 20px max(14px,env(safe-area-inset-bottom));border-top:1px solid var(--g100);display:flex;gap:10px}
+.mfoot .btn{flex:1}
+
+/* ── Menu utente ─────────────────────────────────────────── */
+#umenu{position:fixed;inset:0;z-index:7500;display:none}
+#umenu.show{display:block}
+#umenu .uback{position:absolute;inset:0;background:rgba(42,44,45,.4)}
+.ucard{position:absolute;top:60px;right:14px;background:#fff;border-radius:var(--r);
+  box-shadow:var(--sh-lg);min-width:210px;overflow:hidden;animation:fade .15s}
+.uinfo{padding:14px 16px;border-bottom:1px solid var(--g100)}
+.uinfo .un{font-weight:700;font-size:14.5px;color:var(--g900)}
+.uinfo .ue{font-size:12px;color:var(--grigio);margin-top:2px}
+.uinfo .ur{font-size:11px;font-weight:700;color:var(--verde-d);text-transform:uppercase;margin-top:5px}
+.uitem{padding:13px 16px;font-size:14.5px;font-weight:600;color:var(--red);cursor:pointer;display:flex;align-items:center;gap:9px}
+.uitem:active{background:var(--g50)}
+.uitem svg{width:17px;height:17px;stroke:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader"><span class="spn spn-d" style="width:32px;height:32px;border-width:3px"></span></div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- LOGIN -->
+<div id="login" class="hid">
+  <div class="lbox">
+    <div class="logo-wrap" id="login-logo"></div>
+    <div class="lcard">
+      <h1>Check Sedi</h1>
+      <p class="hint">Accedi per registrare i controlli</p>
+      <div class="lerr" id="lerr"></div>
+      <div class="field">
+        <label>E-Mail</label>
+        <input type="email" id="li-email" autocomplete="username" inputmode="email" autocapitalize="off">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="li-pwd" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" id="li-btn" onclick="doLogin()">Accedi</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hid">
+  <div class="topbar">
+    <button class="tb-back hid" id="tb-back" onclick="goBack()" aria-label="Indietro">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="tb-title">
+      <div class="t" id="tb-t">Check Sedi</div>
+      <div class="s" id="tb-s"></div>
+    </div>
+    <button class="tb-user" id="tb-user" onclick="openUMenu()"></button>
+  </div>
+
+  <!-- VIEW: SEDI -->
+  <div class="view no-bottombar" id="v-sedi"></div>
+  <!-- VIEW: RAPPORTI di una sede -->
+  <div class="view no-bottombar hid" id="v-rapporti"></div>
+  <!-- VIEW: NUOVO RAPPORTO -->
+  <div class="view hid" id="v-nuovo"></div>
+</div>
+
+<!-- MODALE ELEMENTO -->
+<div id="modal">
+  <div class="mback" onclick="closeModal()"></div>
+  <div class="msheet">
+    <div class="mgrip"></div>
+    <div class="mhead">
+      <div class="mt" id="m-titolo"></div>
+      <div class="md" id="m-last"></div>
+    </div>
+    <div class="mbody">
+      <label class="mlabel">Descrizione del controllo</label>
+      <textarea id="m-desc" placeholder="Annota cosa hai verificato…"></textarea>
+      <label class="mlabel" style="margin-top:18px">Esito</label>
+      <div class="toggle">
+        <div class="tg-opt" id="m-ok" onclick="setStato('ok')">
+          <span class="dot"></span> OK
+        </div>
+        <div class="tg-opt" id="m-ko" onclick="setStato('ko')">
+          <span class="dot"></span> KO
+        </div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn btn-primary" onclick="saveVoce()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MENU UTENTE -->
+<div id="umenu">
+  <div class="uback" onclick="closeUMenu()"></div>
+  <div class="ucard">
+    <div class="uinfo">
+      <div class="un" id="um-nome"></div>
+      <div class="ue" id="um-email"></div>
+      <div class="ur" id="um-ruolo"></div>
+    </div>
+    <div class="uitem" onclick="doLogout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Esci
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════════════════════════
+const CFG = {
+  URL:'https://iczsdqcnvauopwkuspti.supabase.co',
+  KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljenNkcWNudmF1b3B3a3VzcHRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTQ0MjMsImV4cCI6MjA5MjQzMDQyM30.SmcRHPLM2PEq4Hn-5CQhMyQKoz0PN_0lbN_X3l9MNUE',
+};
+const T = n => `checksedi_${n}`;
+
+// ════════════════════════════════════════════════════════════════════════
+//  STATO
+// ════════════════════════════════════════════════════════════════════════
+const S = {
+  token:null, user:null,
+  geoEnabled:false,
+  sedi:[], elementi:[], esclusioni:{},   // esclusioni[sede_id] = Set(elemento_id)
+  sedeCorrente:null,
+  rapportiSede:[],
+  // flusso nuovo rapporto
+  flow:null,
+  stack:[],   // navigazione: per il back
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg,type){const t=$('toast');t.textContent=msg;t.className='show'+(type?' '+type:'');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.className=t.className.replace('show','').trim(),2600);}
+function initials(u){const a=(u?.nome||'').trim()[0]||'';const b=(u?.cognome||'').trim()[0]||'';
+  return (a+b).toUpperCase()||(u?.email||'?')[0].toUpperCase();}
+const MESI=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+function fmtData(d){if(!d)return'';const[y,m,g]=d.split('-');return `${+g} ${MESI[+m-1]} ${y}`;}
+function fmtDataBreve(d){if(!d)return'';const[y,m,g]=d.split('-');return `${+g}/${+m}/${String(y).slice(2)}`;}
+function oggiISO(){const d=new Date();const off=d.getTimezoneOffset();
+  const loc=new Date(d.getTime()-off*60000);return loc.toISOString().slice(0,10);}
+
+// ════════════════════════════════════════════════════════════════════════
+//  SUPABASE REST
+// ════════════════════════════════════════════════════════════════════════
+async function db(method, table, opts={}){
+  const {flt='',body=null,sel='*',ord='',lim=''}=opts;
+  let url=`${CFG.URL}/rest/v1/${table}?select=${sel}`;
+  if(flt) url+=`&${flt}`;
+  if(ord) url+=`&order=${ord}`;
+  if(lim) url+=`&limit=${lim}`;
+  const headers={'apikey':CFG.KEY,'Authorization':`Bearer ${S.token||CFG.KEY}`,
+    'Content-Type':'application/json'};
+  if(method==='POST') headers['Prefer']='return=representation';
+  if(method==='PATCH') headers['Prefer']='return=representation';
+  const res=await fetch(url,{method,headers,body:body?JSON.stringify(body):undefined});
+  if(!res.ok){throw new Error(`${method} ${table}: ${await res.text()}`);}
+  return method==='DELETE'?null:res.json();
+}
+async function supaLogin(email,password){
+  const res=await fetch(`${CFG.URL}/auth/v1/token?grant_type=password`,{
+    method:'POST',headers:{'apikey':CFG.KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({email,password})});
+  const data=await res.json();
+  if(!res.ok) throw new Error(data.error_description||data.msg||'Credenziali non valide');
+  return data;
+}
+async function logAz(azione,dettaglio){
+  try{ await db('POST',T('log'),{body:{utente_id:S.user.id,
+    utente_nome:`${S.user.nome} ${S.user.cognome}`.trim(),azione,dettaglio:dettaglio||null}}); }catch(e){}
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  GEO (opzionale)
+// ════════════════════════════════════════════════════════════════════════
+function getGeo(){
+  return new Promise(resolve=>{
+    if(!S.geoEnabled || !navigator.geolocation){resolve(null);return;}
+    if(S.user.geo_consenso===false){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(
+      pos=>{
+        if(S.user.geo_consenso!==true){S.user.geo_consenso=true;
+          db('PATCH',T('profili'),{flt:`id=eq.${S.user.id}`,body:{geo_consenso:true}}).catch(()=>{});}
+        resolve({lat:+pos.coords.latitude.toFixed(7),lng:+pos.coords.longitude.toFixed(7)});
+      },
+      ()=>{
+        if(S.user.geo_consenso!==false){S.user.geo_consenso=false;
+          db('PATCH',T('profili'),{flt:`id=eq.${S.user.id}`,body:{geo_consenso:false}}).catch(()=>{});}
+        resolve(null);
+      },
+      {enableHighAccuracy:true,timeout:8000,maximumAge:60000});
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  LOGO
+// ════════════════════════════════════════════════════════════════════════
+function logoHTML(){
+  return `<div style="font-size:30px;font-weight:800;letter-spacing:-.5px;color:var(--g900)">
+    Medical<span style="color:var(--verde)">Group</span></div>
+    <div class="logo-sub">Check Sedi</div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════════════════════════════
+async function doLogin(){
+  const email=$('li-email').value.trim(), pwd=$('li-pwd').value;
+  const err=$('lerr'), btn=$('li-btn');
+  err.style.display='none';
+  if(!email||!pwd){err.textContent='Inserisci email e password';err.style.display='block';return;}
+  btn.innerHTML='<span class="spn"></span> Accesso…';btn.disabled=true;
+  try{
+    const auth=await supaLogin(email,pwd);
+    S.token=auth.access_token;
+    const [profilo]=await db('GET',T('profili'),{flt:`id=eq.${auth.user.id}`});
+    if(!profilo) throw new Error('Profilo non trovato. Contatta l\'amministratore.');
+    if(profilo.attivo===false) throw new Error('Utente disabilitato. Contatta l\'amministratore.');
+    S.user=profilo;
+    await loadBase();
+    $('login').classList.add('hid'); $('app').classList.remove('hid');
+    $('tb-user').textContent=initials(S.user);
+    renderSedi();
+  }catch(e){
+    err.textContent=e.message;err.style.display='block';
+    btn.innerHTML='Accedi';btn.disabled=false;
+  }
+}
+function doLogout(){ S.token=null;S.user=null;location.reload(); }
+
+async function loadBase(){
+  const [sedi,elementi,esclusioni,cfg]=await Promise.all([
+    db('GET','sedi_sedi',{sel:'id,nome,indirizzo,attiva,ordine',flt:'attiva=eq.true',ord:'ordine.asc,nome.asc'}),
+    db('GET',T('elementi'),{flt:'attivo=eq.true',ord:'ordine.asc'}),
+    db('GET',T('sede_esclusioni'),{sel:'sede_id,elemento_id'}),
+    db('GET',T('config'),{lim:'1'}),
+  ]);
+  S.sedi=sedi; S.elementi=elementi;
+  S.geoEnabled=!!(cfg[0]&&cfg[0].geo_enabled);
+  S.esclusioni={};
+  esclusioni.forEach(e=>{(S.esclusioni[e.sede_id]||(S.esclusioni[e.sede_id]=new Set())).add(e.elemento_id);});
+}
+
+// elementi effettivi per una sede = globali attivi MENO esclusi
+function elementiSede(sedeId){
+  const ex=S.esclusioni[sedeId]||new Set();
+  return S.elementi.filter(e=>!ex.has(e.id));
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  NAVIGAZIONE A VIEW
+// ════════════════════════════════════════════════════════════════════════
+const VIEWS=['v-sedi','v-rapporti','v-nuovo'];
+function showView(id,push){
+  if(push) S.stack.push(currentView());
+  VIEWS.forEach(v=>$(v).classList.toggle('hid',v!==id));
+  $('tb-back').classList.toggle('hid', id==='v-sedi');
+  $(id).scrollTop=0;
+}
+function currentView(){return VIEWS.find(v=>!$(v).classList.contains('hid'))||'v-sedi';}
+function goBack(){
+  const cur=currentView();
+  if(cur==='v-nuovo'){ confirmExitNuovo(); return; }
+  const prev=S.stack.pop()||'v-sedi';
+  if(prev==='v-sedi'){ setTopbar('Check Sedi',''); renderSedi(); showView('v-sedi'); }
+  else { showView(prev); }
+}
+function setTopbar(t,s){$('tb-t').textContent=t;$('tb-s').textContent=s||'';}
+
+// ════════════════════════════════════════════════════════════════════════
+//  VIEW 1 — ELENCO SEDI
+// ════════════════════════════════════════════════════════════════════════
+function renderSedi(filter=''){
+  setTopbar('Check Sedi', `${S.user.nome} ${S.user.cognome}`.trim());
+  const f=filter.trim().toLowerCase();
+  const list=S.sedi.filter(s=>!f|| s.nome.toLowerCase().includes(f) || (s.indirizzo||'').toLowerCase().includes(f));
+  let h=`<div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+    <input id="sede-search" placeholder="Cerca sede…" value="${esc(filter)}" oninput="renderSediDebounced(this.value)">
+  </div>`;
+  h+=`<div class="sec-label">${list.length} sed${list.length===1?'e':'i'}</div>`;
+  if(!list.length){
+    h+=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
+      <div class="et">Nessuna sede</div><div class="es">Prova a cambiare la ricerca</div></div>`;
+  }else{
+    list.forEach(s=>{
+      h+=`<div class="card" onclick="openSede('${s.id}')">
+        <div class="body"><div class="ttl">${esc(s.nome)}</div>
+          <div class="meta">${esc(s.indirizzo||'—')}</div></div>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </div>`;
+    });
+  }
+  const v=$('v-sedi'); v.innerHTML=h;
+  // mantieni focus tastiera se stava cercando
+  const inp=$('sede-search'); if(filter && inp){inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);}
+}
+let _sdt; function renderSediDebounced(v){clearTimeout(_sdt);_sdt=setTimeout(()=>renderSedi(v),120);}
+
+// ════════════════════════════════════════════════════════════════════════
+//  VIEW 2 — RAPPORTI DI UNA SEDE
+// ════════════════════════════════════════════════════════════════════════
+async function openSede(sedeId){
+  S.sedeCorrente=S.sedi.find(s=>s.id===sedeId);
+  setTopbar(S.sedeCorrente.nome, S.sedeCorrente.indirizzo||'');
+  showView('v-rapporti', true);
+  $('v-rapporti').innerHTML=`<div class="empty"><span class="spn spn-d" style="width:28px;height:28px;border-width:3px"></span></div>`;
+  await loadRapportiSede(sedeId);
+  renderRapporti();
+}
+async function loadRapportiSede(sedeId){
+  const raps=await db('GET',T('rapporti'),{
+    flt:`sede_id=eq.${sedeId}`, ord:'data.desc,created_at.desc'});
+  // carica le voci di tutti i rapporti in un colpo
+  const ids=raps.map(r=>r.id);
+  let voci=[];
+  if(ids.length){
+    voci=await db('GET',T('voci'),{flt:`rapporto_id=in.(${ids.join(',')})`});
+  }
+  const byRapp={};
+  voci.forEach(v=>{(byRapp[v.rapporto_id]||(byRapp[v.rapporto_id]=[])).push(v);});
+  const profById={}; S.user&&(profById[S.user.id]=S.user);
+  // nomi incaricati
+  const incIds=[...new Set(raps.map(r=>r.incaricato_id))].filter(id=>!profById[id]);
+  if(incIds.length){
+    const profs=await db('GET',T('profili'),{sel:'id,nome,cognome',flt:`id=in.(${incIds.join(',')})`});
+    profs.forEach(p=>profById[p.id]=p);
+  }
+  raps.forEach(r=>{ r._voci=byRapp[r.id]||[]; r._prof=profById[r.incaricato_id]; });
+  S.rapportiSede=raps;
+}
+function tallyRapporto(r){
+  const tot=elementiSede(r.sede_id).length;
+  let ok=0,ko=0;
+  r._voci.forEach(v=>{ if(v.stato==='ok')ok++; else if(v.stato==='ko')ko++; });
+  const nf=Math.max(0,tot-ok-ko);
+  return {ok,ko,nf};
+}
+function renderRapporti(){
+  const s=S.sedeCorrente;
+  let h=`<button class="fab" onclick="startNuovo()">
+    <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Nuovo controllo</button>`;
+  if(!S.rapportiSede.length){
+    h+=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <div class="et">Nessun controllo registrato</div>
+      <div class="es">Tocca "Nuovo controllo" per iniziare</div></div>`;
+    $('v-rapporti').innerHTML=h; return;
+  }
+  h+=`<div class="sec-label">${S.rapportiSede.length} controll${S.rapportiSede.length===1?'o':'i'}</div>`;
+  S.rapportiSede.forEach(r=>{
+    const t=tallyRapporto(r);
+    const who=r._prof?`${r._prof.nome} ${r._prof.cognome}`.trim():'—';
+    h+=`<div class="rapp ${r.stato==='annullato'?'annullato':''}">
+      <div class="rapp-top">
+        <div><div class="rapp-date">${fmtData(r.data)}</div><div class="rapp-who">${esc(who)}</div></div>
+        ${r.stato==='annullato'?'<span class="badge dt">Annullato</span>':''}
+      </div>
+      <div class="tally">
+        ${t.ok?`<span class="pill ok">${t.ok} ok</span>`:''}
+        ${t.ko?`<span class="pill ko">${t.ko} ko</span>`:''}
+        ${t.nf?`<span class="pill nf">${t.nf} non fatto</span>`:''}
+      </div>
+      ${r.note?`<div style="font-size:13px;color:var(--g700);margin-top:9px;line-height:1.4">${esc(r.note)}</div>`:''}
+    </div>`;
+  });
+  $('v-rapporti').innerHTML=h;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  VIEW 3 — NUOVO RAPPORTO (flusso)
+// ════════════════════════════════════════════════════════════════════════
+//  S.flow = { sedeId, rapportoId, voci:{elemId:{stato,descrizione}}, ultimo:{elemId:{descrizione,data,stato}} }
+function ultimoControlloPerSede(sedeId){
+  // per ogni elemento, la voce più recente (rapporti già ordinati desc)
+  const out={};
+  for(const r of S.rapportiSede){
+    if(r.stato==='annullato') continue;
+    for(const v of r._voci){
+      if(!out[v.elemento_id] && v.stato!=='non_fatto'){
+        out[v.elemento_id]={descrizione:v.descrizione,data:r.data,stato:v.stato};
+      }
+    }
+  }
+  return out;
+}
+function startNuovo(){
+  S.flow={ sedeId:S.sedeCorrente.id, rapportoId:null,
+    voci:{}, ultimo:ultimoControlloPerSede(S.sedeCorrente.id) };
+  setTopbar('Nuovo controllo', S.sedeCorrente.nome);
+  showView('v-nuovo', true);
+  renderNuovo();
+}
+function renderNuovo(){
+  const els=elementiSede(S.flow.sedeId);
+  let h='';
+  if(!els.length){
+    h=`<div class="empty"><div class="et">Nessun elemento in checklist</div>
+      <div class="es">Configura la checklist dal pannello desktop</div></div>`;
+  }
+  els.forEach(e=>{
+    const v=S.flow.voci[e.id];
+    const last=S.flow.ultimo[e.id];
+    let cls='', stateCls='s-nf', icon=`<path d="M5 12h14"/>`;
+    if(v){
+      if(v.stato==='ok'){cls='done-ok';stateCls='s-ok';icon='<path d="M5 12l4 4L19 6"/>';}
+      else if(v.stato==='ko'){cls='done-ko';stateCls='s-ko';icon='<path d="M6 6l12 12M18 6L6 18"/>';}
+    }
+    const lastTxt = last
+      ? `Ultimo: ${last.stato==='ok'?'OK':'KO'} · ${fmtDataBreve(last.data)}${last.descrizione?' · '+esc(last.descrizione):''}`
+      : 'Mai controllato';
+    h+=`<div class="cl-item ${cls}" onclick="openVoce('${e.id}')">
+      <div class="ci-body">
+        <div class="ci-ttl">${esc(e.titolo)}</div>
+        <div class="ci-last">${lastTxt}</div>
+      </div>
+      <div class="ci-state ${stateCls}">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>
+      </div>
+    </div>`;
+  });
+  $('v-nuovo').innerHTML=h+`
+    <div class="bottom-bar">
+      <button class="btn btn-ghost" onclick="confirmExitNuovo()">Annulla</button>
+      <button class="btn btn-primary" onclick="salvaRapporto()">Salva controllo</button>
+    </div>`;
+}
+
+// ── Modale elemento ──────────────────────────────────────────────────────
+let _modalElem=null, _modalStato=null;
+function openVoce(elemId){
+  const e=S.elementi.find(x=>x.id===elemId); if(!e)return;
+  _modalElem=elemId;
+  const existing=S.flow.voci[elemId];
+  const last=S.flow.ultimo[elemId];
+  $('m-titolo').textContent=e.titolo;
+  $('m-last').innerHTML = last
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Ultimo controllo: ${fmtData(last.data)} (${last.stato==='ok'?'OK':'KO'})`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Mai controllato in precedenza`;
+  // precompila: se c'è già una voce in corso usa quella, altrimenti l'ultimo controllo
+  const descPrecomp = existing ? existing.descrizione : (last ? last.descrizione : '');
+  $('m-desc').value=descPrecomp||'';
+  _modalStato = existing ? existing.stato : null;
+  paintToggle();
+  $('modal').classList.add('show');
+}
+function setStato(s){ _modalStato=s; paintToggle(); }
+function paintToggle(){
+  $('m-ok').className='tg-opt'+(_modalStato==='ok'?' sel-ok':'');
+  $('m-ko').className='tg-opt'+(_modalStato==='ko'?' sel-ko':'');
+}
+function closeModal(){ $('modal').classList.remove('show'); _modalElem=null; }
+function saveVoce(){
+  if(!_modalStato){ toast('Seleziona OK o KO','err'); return; }
+  S.flow.voci[_modalElem]={ stato:_modalStato, descrizione:$('m-desc').value.trim() };
+  closeModal();
+  renderNuovo();
+}
+
+// ── Salvataggio rapporto ─────────────────────────────────────────────────
+let _saving=false;
+async function salvaRapporto(){
+  if(_saving)return;
+  const compilati=Object.keys(S.flow.voci).length;
+  if(!compilati){ toast('Compila almeno un elemento','err'); return; }
+  _saving=true;
+  const btn=document.querySelector('#v-nuovo .btn-primary');
+  if(btn){btn.innerHTML='<span class="spn"></span> Salvo…';btn.disabled=true;}
+  try{
+    const geo=await getGeo();
+    const [rap]=await db('POST',T('rapporti'),{body:{
+      sede_id:S.flow.sedeId, incaricato_id:S.user.id, data:oggiISO(),
+      geo_lat:geo?geo.lat:null, geo_lng:geo?geo.lng:null,
+    }});
+    // inserisci le voci compilate
+    const els=S.elementi;
+    const payload=Object.entries(S.flow.voci).map(([elemId,v])=>{
+      const e=els.find(x=>x.id===elemId);
+      return { rapporto_id:rap.id, elemento_id:elemId,
+        titolo_snapshot:e?e.titolo:'(rimosso)', descrizione:v.descrizione||null, stato:v.stato };
+    });
+    if(payload.length) await db('POST',T('voci'),{body:payload});
+    await logAz('rapporto_creato', `${S.sedeCorrente.nome} · ${compilati} elementi`);
+    toast('Controllo salvato','ok');
+    S.flow=null;
+    // ricarica e torna ai rapporti della sede
+    await loadRapportiSede(S.sedeCorrente.id);
+    S.stack=['v-sedi'];
+    showView('v-rapporti');
+    setTopbar(S.sedeCorrente.nome, S.sedeCorrente.indirizzo||'');
+    renderRapporti();
+  }catch(e){
+    toast('Errore nel salvataggio','err');
+    if(btn){btn.innerHTML='Salva controllo';btn.disabled=false;}
+  }finally{ _saving=false; }
+}
+function confirmExitNuovo(){
+  const compilati=Object.keys(S.flow?.voci||{}).length;
+  if(compilati && !confirm('Uscire senza salvare? Gli elementi compilati andranno persi.')) return;
+  S.flow=null;
+  const prev=S.stack.pop()||'v-rapporti';
+  showView('v-rapporti');
+  setTopbar(S.sedeCorrente.nome, S.sedeCorrente.indirizzo||'');
+  renderRapporti();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  MENU UTENTE
+// ════════════════════════════════════════════════════════════════════════
+function openUMenu(){
+  $('um-nome').textContent=`${S.user.nome} ${S.user.cognome}`.trim()||'Utente';
+  $('um-email').textContent=S.user.email;
+  $('um-ruolo').textContent=S.user.ruolo;
+  $('umenu').classList.add('show');
+}
+function closeUMenu(){ $('umenu').classList.remove('show'); }
+
+// ════════════════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════════════════
+(function init(){
+  $('login-logo').innerHTML=logoHTML();
+  $('loader').classList.add('hid');
+  $('login').classList.remove('hid');
+  $('li-pwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+})();
+</script>
+</body>
+</html>
