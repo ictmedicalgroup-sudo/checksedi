@@ -111,7 +111,9 @@ input,select,textarea{font-size:16px!important}
 .badge.cnt{background:var(--verde-xl);color:var(--verde-d)}
 
 /* ── Lista rapporti ──────────────────────────────────────── */
-.rapp{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);padding:14px 16px;margin-bottom:10px}
+.rapp{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:transform .08s}
+.rapp:active{transform:scale(.99)}
+.rapp-edit{width:18px;height:18px;stroke:var(--g300);flex:0 0 auto}
 .rapp.annullato{opacity:.55}
 .rapp-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .rapp-date{font-size:15px;font-weight:700;color:var(--g900)}
@@ -128,6 +130,19 @@ input,select,textarea{font-size:16px!important}
 .empty .es{font-size:13px}
 
 /* ── Checklist (nuovo rapporto) ──────────────────────────── */
+.note-box{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);padding:13px 15px;margin-bottom:12px}
+.note-lbl{display:block;font-size:12px;font-weight:700;color:var(--grigio);text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px}
+.note-box textarea{width:100%;min-height:54px;border:1.5px solid var(--g200);border-radius:var(--rsm);
+  background:var(--g50);padding:10px 12px;resize:vertical;line-height:1.45}
+.note-box textarea:focus{outline:none;border-color:var(--verde);background:#fff}
+.annull-banner{background:var(--ko-bg);color:var(--ko);font-weight:600;font-size:13px;
+  padding:11px 14px;border-radius:var(--r);margin-bottom:12px;line-height:1.4}
+.btn-state{width:100%;margin-top:14px;padding:14px;border:none;border-radius:var(--rsm);
+  font-size:15px;font-weight:700;cursor:pointer;transition:transform .08s}
+.btn-state:active{transform:scale(.985)}
+.btn-state.annulla{background:var(--ko-bg);color:var(--ko)}
+.btn-state.ripristina{background:var(--verde-xl);color:var(--verde-d)}
+.btn-clear{background:var(--ko-bg);color:var(--ko)}
 .cl-item{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);padding:14px 15px;margin-bottom:9px;
   cursor:pointer;transition:transform .08s,background .2s,box-shadow .2s;
   display:flex;align-items:center;gap:12px;border-left:4px solid transparent}
@@ -287,6 +302,7 @@ input,select,textarea{font-size:16px!important}
       </div>
     </div>
     <div class="mfoot">
+      <button class="btn btn-clear" id="m-clear" onclick="clearVoce()" style="display:none">Azzera</button>
       <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
       <button class="btn btn-primary" onclick="saveVoce()">Salva</button>
     </div>
@@ -565,10 +581,10 @@ function renderRapporti(){
   S.rapportiSede.forEach(r=>{
     const t=tallyRapporto(r);
     const who=r._prof?`${r._prof.nome} ${r._prof.cognome}`.trim():'—';
-    h+=`<div class="rapp ${r.stato==='annullato'?'annullato':''}">
+    h+=`<div class="rapp ${r.stato==='annullato'?'annullato':''}" onclick="openRapporto('${r.id}')">
       <div class="rapp-top">
         <div><div class="rapp-date">${fmtData(r.data)}${r.created_at?` <span style="font-size:12.5px;font-weight:600;color:var(--grigio)">ore ${fmtOra(r.created_at)}</span>`:''}</div><div class="rapp-who">${esc(who)}</div></div>
-        ${r.stato==='annullato'?'<span class="badge dt">Annullato</span>':''}
+        ${r.stato==='annullato'?'<span class="badge dt">Annullato</span>':'<svg class="rapp-edit" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'}
       </div>
       <div class="tally">
         ${t.ok?`<span class="pill ok">${t.ok} ok</span>`:''}
@@ -585,11 +601,13 @@ function renderRapporti(){
 //  VIEW 3 — NUOVO RAPPORTO (flusso)
 // ════════════════════════════════════════════════════════════════════════
 //  S.flow = { sedeId, rapportoId, voci:{elemId:{stato,descrizione}}, ultimo:{elemId:{descrizione,data,stato}} }
-function ultimoControlloPerSede(sedeId){
-  // per ogni elemento, la voce più recente (rapporti già ordinati desc)
+function ultimoControlloPerSede(sedeId, escludiId){
+  // per ogni elemento, la voce più recente (rapporti già ordinati desc).
+  // escludiId: id di un rapporto da ignorare (es. quello che sto modificando).
   const out={};
   for(const r of S.rapportiSede){
     if(r.stato==='annullato') continue;
+    if(escludiId && r.id===escludiId) continue;
     for(const v of r._voci){
       if(!out[v.elemento_id] && v.stato!=='non_fatto'){
         out[v.elemento_id]={descrizione:v.descrizione,data:r.data,created_at:r.created_at,stato:v.stato};
@@ -599,18 +617,42 @@ function ultimoControlloPerSede(sedeId){
   return out;
 }
 function startNuovo(){
-  S.flow={ sedeId:S.sedeCorrente.id, rapportoId:null,
-    voci:{}, ultimo:ultimoControlloPerSede(S.sedeCorrente.id) };
+  S.flow={ mode:'new', sedeId:S.sedeCorrente.id, rapportoId:null, stato:'attivo',
+    note:'', voci:{}, orig:null, ultimo:ultimoControlloPerSede(S.sedeCorrente.id) };
   setTopbar('Nuovo controllo', S.sedeCorrente.nome);
   const sb=$('bb-save'); if(sb){sb.innerHTML='Salva controllo';sb.disabled=false;}
   showView('v-nuovo', true);
   renderNuovo();
 }
+function openRapporto(id){
+  const r=S.rapportiSede.find(x=>x.id===id); if(!r)return;
+  // voci esistenti del rapporto → mappa elemento→{stato,descrizione}
+  const voci={};
+  r._voci.forEach(v=>{ if(v.stato!=='non_fatto') voci[v.elemento_id]={stato:v.stato,descrizione:v.descrizione||''}; });
+  S.flow={ mode:'edit', sedeId:r.sede_id, rapportoId:r.id, stato:r.stato,
+    note:r.note||'', voci, orig:{ note:r.note||'', voci:JSON.parse(JSON.stringify(voci)) },
+    // per il riferimento "ultimo controllo" escludo il rapporto stesso
+    ultimo:ultimoControlloPerSede(r.sede_id, r.id) };
+  setTopbar('Modifica controllo', `${fmtData(r.data)}${r.created_at?' · '+fmtOra(r.created_at):''}`);
+  const sb=$('bb-save'); if(sb){sb.innerHTML='Salva modifiche';sb.disabled=false;}
+  showView('v-nuovo', true);
+  renderNuovo();
+}
 function renderNuovo(){
   const els=elementiSede(S.flow.sedeId);
+  const editing=S.flow.mode==='edit';
+  const annull=S.flow.stato==='annullato';
   let h='';
+  // nota generale editabile
+  h+=`<div class="note-box">
+    <label class="note-lbl">Nota del controllo</label>
+    <textarea id="rap-note" placeholder="Nota generale (opzionale)" oninput="S.flow.note=this.value">${esc(S.flow.note||'')}</textarea>
+  </div>`;
+  if(annull){
+    h+=`<div class="annull-banner">Questo controllo è annullato. Ripristinalo per renderlo di nuovo valido.</div>`;
+  }
   if(!els.length){
-    h=`<div class="empty"><div class="et">Nessun elemento in checklist</div>
+    h+=`<div class="empty"><div class="et">Nessun elemento in checklist</div>
       <div class="es">Configura la checklist dal pannello desktop</div></div>`;
   }
   els.forEach(e=>{
@@ -634,6 +676,12 @@ function renderNuovo(){
       </div>
     </div>`;
   });
+  // azioni di stato solo in modifica (annulla / ripristina)
+  if(editing){
+    h+= annull
+      ? `<button class="btn-state ripristina" onclick="setRapportoStato('attivo')">↻ Ripristina controllo</button>`
+      : `<button class="btn-state annulla" onclick="setRapportoStato('annullato')">🗑 Elimina (annulla) controllo</button>`;
+  }
   $('v-nuovo').innerHTML=h;
 }
 
@@ -648,11 +696,13 @@ function openVoce(elemId){
   $('m-last').innerHTML = last
     ? `<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Ultimo controllo: ${fmtData(last.data)}${last.created_at?' · '+fmtOra(last.created_at):''} ${tagEsito(last.stato)}`
     : `<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Mai controllato in precedenza`;
-  // precompila: se c'è già una voce in corso usa quella, altrimenti l'ultimo controllo
+  // precompila: se c'è già una voce nel flusso usa quella, altrimenti l'ultimo controllo
   const descPrecomp = existing ? existing.descrizione : (last ? last.descrizione : '');
   $('m-desc').value=descPrecomp||'';
   _modalStato = existing ? existing.stato : null;
   paintToggle();
+  // mostra il pulsante "azzera" solo se l'elemento ha già una voce
+  const clr=$('m-clear'); if(clr) clr.style.display = existing ? '' : 'none';
   $('modal').classList.add('show');
 }
 function setStato(s){ _modalStato=s; paintToggle(); }
@@ -667,11 +717,18 @@ function saveVoce(){
   closeModal();
   renderNuovo();
 }
+// riporta l'elemento a "non fatto" (rimuove la voce dal flusso)
+function clearVoce(){
+  if(_modalElem){ delete S.flow.voci[_modalElem]; }
+  closeModal();
+  renderNuovo();
+}
 
-// ── Salvataggio rapporto ─────────────────────────────────────────────────
+// ── Salvataggio rapporto (crea o modifica) ───────────────────────────────
 let _saving=false;
 async function salvaRapporto(){
   if(_saving)return;
+  if(S.flow.mode==='edit'){ return salvaModifica(); }
   const compilati=Object.keys(S.flow.voci).length;
   if(!compilati){ toast('Compila almeno un elemento','err'); return; }
   _saving=true;
@@ -681,9 +738,9 @@ async function salvaRapporto(){
     const geo=await getGeo();
     const [rap]=await db('POST',T('rapporti'),{body:{
       sede_id:S.flow.sedeId, incaricato_id:S.user.id, data:oggiISO(),
+      note:S.flow.note?S.flow.note.trim()||null:null,
       geo_lat:geo?geo.lat:null, geo_lng:geo?geo.lng:null,
     }});
-    // inserisci le voci compilate
     const els=S.elementi;
     const payload=Object.entries(S.flow.voci).map(([elemId,v])=>{
       const e=els.find(x=>x.id===elemId);
@@ -693,23 +750,106 @@ async function salvaRapporto(){
     if(payload.length) await db('POST',T('voci'),{body:payload});
     await logAz('rapporto_creato', `${S.sedeCorrente.nome} · ${compilati} elementi`);
     toast('Controllo salvato','ok');
-    S.flow=null;
-    // ricarica e torna ai rapporti della sede
-    await loadRapportiSede(S.sedeCorrente.id);
-    S.stack=['v-sedi'];
-    showView('v-rapporti');
-    setTopbar(S.sedeCorrente.nome, S.sedeCorrente.indirizzo||'');
-    renderRapporti();
+    await chiudiFlusso();
   }catch(e){
     toast('Errore nel salvataggio','err');
     if(btn){btn.innerHTML='Salva controllo';btn.disabled=false;}
   }finally{ _saving=false; }
 }
-function confirmExitNuovo(){
-  const compilati=Object.keys(S.flow?.voci||{}).length;
-  if(compilati && !confirm('Uscire senza salvare? Gli elementi compilati andranno persi.')) return;
+
+async function salvaModifica(){
+  _saving=true;
+  const btn=$('bb-save');
+  if(btn){btn.innerHTML='<span class="spn"></span> Salvo…';btn.disabled=true;}
+  try{
+    const rid=S.flow.rapportoId;
+    const els=S.elementi;
+    const orig=S.flow.orig;
+    const diffs=[];
+    // titolo elemento per i log
+    const titoloEl=eid=>{const e=els.find(x=>x.id===eid);return e?e.titolo:'(elemento)';};
+
+    // nota
+    const newNote=(S.flow.note||'').trim();
+    if((orig.note||'')!==newNote){
+      await db('PATCH',T('rapporti'),{flt:`id=eq.${rid}`,body:{note:newNote||null}});
+      diffs.push(`nota: "${orig.note||'∅'}" → "${newNote||'∅'}"`);
+    }
+
+    // confronta voci: union delle chiavi
+    const keys=new Set([...Object.keys(orig.voci),...Object.keys(S.flow.voci)]);
+    for(const eid of keys){
+      const o=orig.voci[eid];           // {stato,descrizione} o undefined
+      const n=S.flow.voci[eid];
+      const oStato=o?o.stato:'non_fatto', oDesc=o?o.descrizione||'':'';
+      const nStato=n?n.stato:'non_fatto', nDesc=n?n.descrizione||'':'';
+      if(oStato===nStato && oDesc===nDesc) continue;
+      if(nStato==='non_fatto'){
+        // elimina la voce (torna a non fatto)
+        await db('DELETE',T('voci'),{flt:`rapporto_id=eq.${rid}&elemento_id=eq.${eid}`});
+        diffs.push(`${titoloEl(eid)}: ${lblStato(oStato)} → non fatto`);
+      }else if(oStato==='non_fatto'){
+        // nuova voce
+        await db('POST',T('voci'),{body:{rapporto_id:rid,elemento_id:eid,
+          titolo_snapshot:titoloEl(eid),descrizione:nDesc||null,stato:nStato}});
+        diffs.push(`${titoloEl(eid)}: non fatto → ${lblStato(nStato)}`);
+      }else{
+        // update voce esistente
+        await db('PATCH',T('voci'),{flt:`rapporto_id=eq.${rid}&elemento_id=eq.${eid}`,
+          body:{descrizione:nDesc||null,stato:nStato}});
+        if(oStato!==nStato) diffs.push(`${titoloEl(eid)}: ${lblStato(oStato)} → ${lblStato(nStato)}`);
+        else diffs.push(`${titoloEl(eid)}: descrizione modificata`);
+      }
+    }
+
+    if(!diffs.length){ toast('Nessuna modifica'); if(btn){btn.innerHTML='Salva modifiche';btn.disabled=false;} _saving=false; return; }
+    await logAz('rapporto_modificato', `${nomeSedeCorrente()} — ${diffs.join(' · ')}`);
+    toast('Modifiche salvate','ok');
+    await chiudiFlusso();
+  }catch(e){
+    toast('Errore nel salvataggio','err');
+    if(btn){btn.innerHTML='Salva modifiche';btn.disabled=false;}
+  }finally{ _saving=false; }
+}
+
+async function setRapportoStato(stato){
+  const azione = stato==='annullato' ? 'annullare (eliminare)' : 'ripristinare';
+  if(!confirm(`Vuoi ${azione} questo controllo?`)) return;
+  try{
+    await db('PATCH',T('rapporti'),{flt:`id=eq.${S.flow.rapportoId}`,body:{stato}});
+    await logAz(stato==='annullato'?'rapporto_annullato':'rapporto_ripristinato',
+      `${nomeSedeCorrente()}: attivo→${stato==='annullato'?'annullato':'attivo'}`);
+    S.flow.stato=stato;
+    toast(stato==='annullato'?'Controllo annullato':'Controllo ripristinato','ok');
+    await chiudiFlusso();
+  }catch(e){toast('Operazione non riuscita','err');}
+}
+
+function nomeSedeCorrente(){return S.sedeCorrente?S.sedeCorrente.nome:nomeSede(S.flow.sedeId);}
+function lblStato(s){return {ok:'OK',ko:'KO',non_fatto:'non fatto'}[s]||s;}
+
+async function chiudiFlusso(){
   S.flow=null;
-  const prev=S.stack.pop()||'v-rapporti';
+  await loadRapportiSede(S.sedeCorrente.id);
+  S.stack=['v-sedi'];
+  showView('v-rapporti');
+  setTopbar(S.sedeCorrente.nome, S.sedeCorrente.indirizzo||'');
+  renderRapporti();
+}
+
+function confirmExitNuovo(){
+  // in modifica, confronto col snapshot; in creazione, basta avere voci
+  let dirty=false;
+  if(S.flow){
+    if(S.flow.mode==='edit'){
+      dirty = JSON.stringify({n:(S.flow.note||'').trim(),v:S.flow.voci})
+            !== JSON.stringify({n:(S.flow.orig.note||'').trim(),v:S.flow.orig.voci});
+    }else{
+      dirty = Object.keys(S.flow.voci||{}).length>0 || !!(S.flow.note||'').trim();
+    }
+  }
+  if(dirty && !confirm('Uscire senza salvare? Le modifiche andranno perse.')) return;
+  S.flow=null;
   showView('v-rapporti');
   setTopbar(S.sedeCorrente.nome, S.sedeCorrente.indirizzo||'');
   renderRapporti();
