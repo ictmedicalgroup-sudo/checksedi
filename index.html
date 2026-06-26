@@ -464,9 +464,11 @@ async function loadBase(){
     db('GET',T('elementi'),{flt:'attivo=eq.true',ord:'ordine.asc'}),
     db('GET',T('sede_esclusioni'),{sel:'sede_id,elemento_id'}),
     db('GET',T('config'),{lim:'1'}),
-    db('GET',T('incaricato_sedi'),{sel:'sede_id'}),  // RLS: solo le proprie
+    db('GET',T('incaricato_sedi'),{sel:'sede_id',flt:`utente_id=eq.${S.user.id}`}),
   ]);
-  // l'utente vede SOLO le sedi a lui associate (vale anche per gli admin)
+  // l'utente vede SOLO le sedi a lui associate (vale anche per gli admin).
+  // Filtro esplicitamente per utente_id: la RLS lascia passare TUTTE le righe
+  // agli admin (serve al desktop), quindi qui non posso affidarmi a quella.
   const assegnate=new Set((assoc||[]).map(a=>a.sede_id));
   S.sedi=sedi.filter(s=>assegnate.has(s.id));
   S.elementi=elementi;
