@@ -42,7 +42,7 @@ input,select,textarea{font-size:16px!important}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── Toast (in ALTO) ─────────────────────────────────────── */
-#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%) translateY(-140%);
+#toast{position:fixed;top:calc(env(safe-area-inset-top, 0px) + 22px);left:50%;transform:translateX(-50%) translateY(-220%);
   z-index:9500;background:var(--navy);color:#fff;padding:12px 18px;border-radius:var(--r);
   box-shadow:var(--sh-lg);font-size:14.5px;font-weight:600;max-width:90vw;text-align:center;
   transition:transform .28s cubic-bezier(.2,.8,.3,1)}
@@ -459,13 +459,17 @@ async function doLogin(){
 function doLogout(){ S.token=null;S.user=null;location.reload(); }
 
 async function loadBase(){
-  const [sedi,elementi,esclusioni,cfg]=await Promise.all([
+  const [sedi,elementi,esclusioni,cfg,assoc]=await Promise.all([
     db('GET','sedi_sedi',{sel:'id,nome,indirizzo,attiva,ordine',flt:'attiva=eq.true',ord:'ordine.asc,nome.asc'}),
     db('GET',T('elementi'),{flt:'attivo=eq.true',ord:'ordine.asc'}),
     db('GET',T('sede_esclusioni'),{sel:'sede_id,elemento_id'}),
     db('GET',T('config'),{lim:'1'}),
+    db('GET',T('incaricato_sedi'),{sel:'sede_id'}),  // RLS: solo le proprie
   ]);
-  S.sedi=sedi; S.elementi=elementi;
+  // l'utente vede SOLO le sedi a lui associate (vale anche per gli admin)
+  const assegnate=new Set((assoc||[]).map(a=>a.sede_id));
+  S.sedi=sedi.filter(s=>assegnate.has(s.id));
+  S.elementi=elementi;
   S.geoEnabled=!!(cfg[0]&&cfg[0].geo_enabled);
   S.esclusioni={};
   esclusioni.forEach(e=>{(S.esclusioni[e.sede_id]||(S.esclusioni[e.sede_id]=new Set())).add(e.elemento_id);});
@@ -503,6 +507,13 @@ function setTopbar(t,s){$('tb-t').textContent=t;$('tb-s').textContent=s||'';}
 // ════════════════════════════════════════════════════════════════════════
 function renderSedi(filter=''){
   setTopbar('Check Sedi', `${S.user.nome} ${S.user.cognome}`.trim());
+  // nessuna sede assegnata all'utente: non mostro la ricerca
+  if(!S.sedi.length){
+    $('v-sedi').innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
+      <div class="et">Nessuna sede assegnata</div>
+      <div class="es">Chiedi a un amministratore di associarti le sedi da controllare</div></div>`;
+    return;
+  }
   const f=filter.trim().toLowerCase();
   const list=S.sedi.filter(s=>!f|| s.nome.toLowerCase().includes(f) || (s.indirizzo||'').toLowerCase().includes(f));
   let h=`<div class="search">
@@ -512,7 +523,7 @@ function renderSedi(filter=''){
   h+=`<div class="sec-label">${list.length} sed${list.length===1?'e':'i'}</div>`;
   if(!list.length){
     h+=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
-      <div class="et">Nessuna sede</div><div class="es">Prova a cambiare la ricerca</div></div>`;
+      <div class="et">Nessun risultato</div><div class="es">Prova a cambiare la ricerca</div></div>`;
   }else{
     list.forEach(s=>{
       h+=`<div class="card" onclick="openSede('${s.id}')">
