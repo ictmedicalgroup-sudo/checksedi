@@ -363,13 +363,18 @@ async function loadBase(){
     db('GET',T('elementi'),{ord:'ordine.asc'}),
     db('GET',T('sede_esclusioni'),{sel:'sede_id,elemento_id'}),
     db('GET',T('profili'),{ord:'cognome.asc,nome.asc'}),
+    db('GET',T('incaricato_sedi'),{sel:'utente_id,sede_id'}),
   ];
-  const [sedi,elementi,escl,profili]=await Promise.all(reqs);
+  const [sedi,elementi,escl,profili,assoc]=await Promise.all(reqs);
   S.sedi=sedi; S.elementi=elementi; S.profili=profili;
   S.profById={}; profili.forEach(p=>S.profById[p.id]=p);
   S.esclusioni={};
   escl.forEach(e=>{(S.esclusioni[e.sede_id]||(S.esclusioni[e.sede_id]=new Set())).add(e.elemento_id);});
+  // associazioni: assocByUser[utente_id] = Set(sede_id)
+  S.assocByUser={};
+  (assoc||[]).forEach(a=>{(S.assocByUser[a.utente_id]||(S.assocByUser[a.utente_id]=new Set())).add(a.sede_id);});
 }
+function sediAssegnate(uid){return S.assocByUser&&S.assocByUser[uid]?S.assocByUser[uid]:new Set();}
 function elementiAttivi(){return S.elementi.filter(e=>e.attivo);}
 function elementiSede(sedeId){const ex=S.esclusioni[sedeId]||new Set();return elementiAttivi().filter(e=>!ex.has(e.id));}
 
@@ -768,20 +773,68 @@ async function toggleEsclusione(sedeId,elemId,incluso){
 //  PAGINA — PROFILI (admin)
 // ════════════════════════════════════════════════════════════════════════
 function renderProfili(){
-  let rows=S.profili.map(p=>`<tr class="${p.attivo?'':'row-annullata'}">
+  let rows=S.profili.map(p=>{
+    const n=sediAssegnate(p.id).size;
+    return `<tr class="${p.attivo?'':'row-annullata'}">
     <td><strong>${esc(`${p.nome} ${p.cognome}`.trim()||'—')}</strong></td>
     <td class="muted">${esc(p.email)}</td>
     <td><span class="pill ${p.ruolo}">${p.ruolo}</span></td>
     <td>${p.attivo?'<span class="pill on">Attivo</span>':'<span class="pill off">Disattivo</span>'}</td>
+    <td>${n?`<span class="pill incaricato">${n} sed${n===1?'e':'i'}</span>`:'<span class="muted">nessuna</span>'}
+        <button class="linkact" onclick="openSediModal('${p.id}')">Gestisci</button></td>
     <td>${p.geo_consenso===false?'<button class="linkact" onclick="resetGeo(\''+p.id+'\')">Reset geo</button>':p.geo_consenso===true?'<span class="muted">concesso</span>':'<span class="muted">—</span>'}</td>
     <td><button class="linkact" onclick="openUserModal('${p.id}')">Modifica</button></td>
-  </tr>`).join('');
+  </tr>`;}).join('');
   $('main').innerHTML=`
     <div class="page-head"><div><h2>Profili di accesso</h2>
-      <div class="desc">Utenti del tool e relativi permessi</div></div>
+      <div class="desc">Utenti del tool, permessi e sedi assegnate</div></div>
       <div class="actions"><button class="btn btn-primary" onclick="openUserModal()">+ Nuovo utente</button></div></div>
-    <div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Email</th><th>Ruolo</th><th>Stato</th><th>Geo</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="6" class="empty">Nessun utente</td></tr>'}</tbody></table></div>`;
+    <div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Email</th><th>Ruolo</th><th>Stato</th><th>Sedi assegnate</th><th>Geo</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7" class="empty">Nessun utente</td></tr>'}</tbody></table></div>`;
+}
+
+// ── Modale assegnazione sedi ──────────────────────────────────────────────
+function openSediModal(uid){
+  const p=S.profById[uid]; if(!p)return;
+  const assigned=sediAssegnate(uid);
+  const attive=S.sedi.filter(s=>s.attiva!==false);
+  const rows=attive.map(s=>`<label class="el-row" style="cursor:pointer">
+      <input type="checkbox" class="sede-chk" value="${s.id}" ${assigned.has(s.id)?'checked':''} style="width:17px;height:17px;accent-color:var(--verde)">
+      <span class="et">${esc(s.nome)}</span>
+      <span class="muted" style="font-size:12px">${esc(s.indirizzo||'')}</span>
+    </label>`).join('');
+  const body=`
+    <p class="desc" style="margin-bottom:6px">Seleziona le sedi che <strong>${esc(`${p.nome} ${p.cognome}`.trim()||p.email)}</strong> potrà controllare dal mobile.</p>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <button class="btn btn-ghost btn-sm" onclick="toggleAllSedi(true)">Seleziona tutte</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleAllSedi(false)">Deseleziona tutte</button>
+    </div>
+    <div class="el-list" id="sedi-list" style="max-height:50vh;overflow:auto">${rows||'<div class="muted">Nessuna sede attiva</div>'}</div>`;
+  const foot=`<button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+    <button class="btn btn-primary" id="sedi-save" onclick="saveSediAssoc('${uid}')">Salva</button>`;
+  openModal('Sedi assegnate',body,foot,true);
+}
+function toggleAllSedi(val){document.querySelectorAll('#sedi-list .sede-chk').forEach(c=>c.checked=val);}
+async function saveSediAssoc(uid){
+  const checked=new Set([...document.querySelectorAll('#sedi-list .sede-chk:checked')].map(c=>c.value));
+  const before=sediAssegnate(uid);
+  const toAdd=[...checked].filter(id=>!before.has(id));
+  const toDel=[...before].filter(id=>!checked.has(id));
+  const btn=$('sedi-save');btn.innerHTML='<span class="spn"></span>';btn.disabled=true;
+  try{
+    if(toAdd.length){
+      await db('POST',T('incaricato_sedi'),{body:toAdd.map(sede_id=>({utente_id:uid,sede_id,created_by:S.user.id}))});
+    }
+    for(const sede_id of toDel){
+      await db('DELETE',T('incaricato_sedi'),{flt:`utente_id=eq.${uid}&sede_id=eq.${sede_id}`});
+    }
+    if(toAdd.length||toDel.length){
+      const det=[]; if(toAdd.length)det.push(`+${toAdd.length}`); if(toDel.length)det.push(`-${toDel.length}`);
+      await logAz('sedi_assegnate', `${nomeUtente(uid)}: ${checked.size} sedi (${det.join(' ')})`);
+    }
+    await loadBase();
+    toast('Sedi aggiornate','ok');closeModal();renderProfili();
+  }catch(e){toast('Salvataggio non riuscito','err');btn.innerHTML='Salva';btn.disabled=false;}
 }
 function openUserModal(id){
   const p=id?S.profById[id]:null;
